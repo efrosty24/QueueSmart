@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.yarn/
+bower_components/
+
+# Build output
+dist/
+dist-ssr/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+CLAUDE.md
+SKILLS.md
+
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python (backend)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# AI assistant files (kept local, not tracked)
+CLAUDE.md
+AGENTS.md
+OPINIONS.md
+SKILLS.md
+.claude/
