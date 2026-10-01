@@ -123,6 +123,10 @@
   min-height: 40px;
 }
 
+.sidebar__notification-count {
+  margin-left: auto;
+}
+
 /* ---------- Main ---------- */
 
 .app-shell__main {
