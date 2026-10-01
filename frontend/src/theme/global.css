@@ -116,6 +116,15 @@ a:hover {
   color: var(--color-text);
 }
 
+.btn-danger {
+  background: transparent;
+  color: var(--color-danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+}
+
 .btn-block {
   width: 100%;
 }
@@ -136,6 +145,71 @@ a:hover {
 .alert-success {
   background: var(--color-success-bg);
   color: var(--color-success);
+}
+
+/* ---------- Dialog ---------- */
+
+.dialog-scrim {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--scrim);
+  z-index: 10;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 28rem;
+  max-height: calc(100dvh - var(--space-8));
+  overflow-y: auto;
+  padding: var(--space-6);
+}
+
+.dialog__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.dialog__heading h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.dialog__close {
+  min-height: auto;
+  padding: var(--space-1) var(--space-2);
+}
+
+.dialog__message {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (max-width: 480px) {
+  .dialog {
+    padding: var(--space-5);
+  }
+
+  .dialog__actions {
+    flex-direction: column-reverse;
+  }
+
+  .dialog__actions .btn {
+    width: 100%;
+  }
 }
 
 /* ---------- Helpers ---------- */

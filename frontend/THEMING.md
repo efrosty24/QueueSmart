@@ -76,6 +76,8 @@ Glass only looks frosted when there's something colorful behind it. The page bac
 
 **Form fields:** `--field-bg`, `--field-border`, `--field-border-focus`, `--focus-ring`
 
+**Overlay:** `--scrim` — backdrop behind a modal dialog (see `ServiceFormDialog.tsx` for an example)
+
 **Spacing:** `--space-1` (4px), `-2` (8px), `-3` (12px), `-4` (16px), `-5` (20px), `-6` (24px), `-8` (32px), `-10` (40px)
 
 **Radius:** `--radius-sm` (8px), `--radius-md` (12px), `--radius-lg` (20px), `--radius-full`
@@ -89,8 +91,9 @@ Glass only looks frosted when there's something colorful behind it. The page bac
 | Class | What it is |
 |---|---|
 | `.glass` | Frosted panel |
-| `.btn` + `.btn-primary` / `.btn-ghost` | Buttons (add `.btn-block` for full width) |
+| `.btn` + `.btn-primary` / `.btn-ghost` / `.btn-danger` | Buttons (add `.btn-block` for full width) |
 | `.alert` + `.alert-error` / `.alert-success` | Inline status messages |
+| `.dialog-scrim` + `.dialog` | Modal dialog (backdrop + centered glass panel) — see `ConfirmDialog.tsx` and `ServiceFormDialog.tsx` |
 | `.visually-hidden` | Hidden on screen, still read by screen readers |
 
-For text inputs, use the `TextField` component (`src/components/TextField.tsx`). It handles the label, hint, error message, accessibility attributes and the password Show/Hide button.
+For text inputs, use the `TextField` component (`src/components/TextField.tsx`). It handles the label, hint, error message, accessibility attributes and the password Show/Hide button. For multi-line text use `TextArea`, and for a fixed set of choices use `SelectField` — both live alongside `TextField` and share its stylesheet, so all three always look consistent.

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { TextField } from '../../components/TextField'
+import { useForm } from '../../hooks/useForm'
 import { AuthLayout } from './AuthLayout'
 import { useAuth } from './AuthProvider'
 import { login } from './authApi'
-import { useAuthForm } from './useAuthForm'
 import { validateLogin } from './validation'
 
 export function LoginPage() {
@@ -13,16 +13,17 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   // Send people back to the page they tried to open before being asked to sign in.
-  const redirectTo = (location.state as { from?: string } | null)?.from ?? '/dashboard'
+  const redirectTo = (location.state as { from?: string } | null)?.from
 
-  const { fieldProps, handleSubmit, submitting } = useAuthForm({
+  const { fieldProps, handleSubmit, submitting } = useForm({
     initialValues: { email: '', password: '' },
     validate: validateLogin,
     onSubmit: async (values) => {
       setError(null)
       try {
-        signIn(await login(values))
-        navigate(redirectTo, { replace: true })
+        const user = await login(values)
+        signIn(user)
+        navigate(redirectTo ?? (user.role === 'admin' ? '/admin' : '/dashboard'), { replace: true })
       } catch {
         setError('Could not sign in. Check your email and password.')
       }
