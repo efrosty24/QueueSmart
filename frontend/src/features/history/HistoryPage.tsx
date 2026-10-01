@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
-import type { IconType } from 'react-icons'
-import { LuCircleCheck, LuDoorOpen, LuInbox, LuUserX } from 'react-icons/lu'
+import { LuInbox } from 'react-icons/lu'
 import { PageHeader } from '../../components/PageHeader'
 import { ServiceIcon } from '../../components/ServiceIcon'
 import { formatDate, formatMinutes, formatTime } from '../../lib/format'
 import type { VisitOutcome } from '../../mocks/history'
 import { services } from '../../mocks/services'
 import { getHistory, outcomeLabels, summarize } from './history'
+import { OutcomeBadge } from './OutcomeBadge'
 import './history.css'
 
 type Filter = 'all' | VisitOutcome
@@ -17,12 +17,6 @@ const filters: { value: Filter; label: string }[] = [
   { value: 'left', label: outcomeLabels.left },
   { value: 'no-show', label: outcomeLabels['no-show'] },
 ]
-
-const outcomeStyles: Record<VisitOutcome, { className: string; icon: IconType }> = {
-  served: { className: 'badge-success', icon: LuCircleCheck },
-  left: { className: 'badge-neutral', icon: LuDoorOpen },
-  'no-show': { className: 'badge-danger', icon: LuUserX },
-}
 
 export function HistoryPage() {
   // Read once per visit to the page; the list doesn't change while it's open.
@@ -89,7 +83,6 @@ export function HistoryPage() {
             </thead>
             <tbody role="rowgroup">
               {shown.map((visit) => {
-                const { className, icon: Icon } = outcomeStyles[visit.outcome]
                 const joined = new Date(visit.joinedAt)
                 return (
                   <tr key={visit.id} role="row">
@@ -112,10 +105,7 @@ export function HistoryPage() {
                     </td>
                     <td role="cell" data-label="Wait">{visit.waitedMinutes === null ? '—' : formatMinutes(visit.waitedMinutes)}</td>
                     <td role="cell" data-label="Outcome">
-                      <span className={`badge ${className}`}>
-                        <Icon aria-hidden="true" />
-                        {outcomeLabels[visit.outcome]}
-                      </span>
+                      <OutcomeBadge outcome={visit.outcome} />
                     </td>
                   </tr>
                 )

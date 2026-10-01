@@ -15,10 +15,14 @@ QueueSmart/
 ```
 frontend/src/
 ├── theme/           # design tokens, glass styles, light/dark/system logic
-├── components/      # shared UI (AppHeader, TextField, ThemeToggle)
+├── components/      # shared UI (AppShell sidebar, ConfirmDialog, PageHeader, TextField, ...)
+├── lib/             # small helpers (date/time formatting)
+├── mocks/           # mock data: services, live queue timeline, visit history
 └── features/
     ├── auth/        # login, registration, validation, mock session, route guards
-    └── dashboard/   # page users land on after signing in
+    ├── dashboard/   # overview: current queue + recent visits
+    ├── queue/       # Queue status screen
+    └── history/     # History screen
 ```
 
 Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.md) before writing UI.**
@@ -28,10 +32,26 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 - **Login** (`/login`) and **Registration** (`/register`). Email is the username.
 - Client-side validation: required fields, email format, password rules (8+ characters with a letter and a number), and matching confirmation on sign-up.
 - **Mock sign-in:** a valid login or registration signs the user in and redirects to **`/dashboard`**. The session is kept in the browser, so it survives a reload. **Sign out** clears it.
-- **Route guards:** signed-out users who open `/dashboard` are sent to `/login`. Signed-in users who open `/login` or `/register` are sent to `/dashboard`.
+- **Route guards:** signed-out users who open a signed-in page are sent to `/login`. Signed-in users who open `/login` or `/register` are sent to `/dashboard`.
+- **Sidebar layout** for signed-in pages, with Dashboard, Queue status and History. Below 900px it becomes a slide-in menu. **Sign out** is a pill that turns red on hover and asks for confirmation in a popup.
+- **Dashboard** (`/dashboard`): a snapshot of the current queue and the three most recent visits.
+- **Queue status** (`/queue`): current position, estimated wait, people ahead, and status (Waiting → Almost ready → Served), with a feed of status updates.
+- **History** (`/history`): past queues with date, service, wait and outcome (Served, Left queue, No-show), summary totals, and an outcome filter.
 - Light, dark and system themes with a frosted-glass look.
 
-There is no backend yet. Any valid email and password is accepted, and every account is a patient. The fake calls are in `frontend/src/features/auth/authApi.ts`.
+### Mock data
+
+There is no backend yet, so everything runs on mock data in `frontend/src/mocks/`:
+
+| File | What it fakes |
+|---|---|
+| `services.ts` | Clinic services (Sick Visit, Flu Shot, Prescription Refill, Lab Work) and their expected minutes per patient |
+| `activeQueue.ts` | The patient's current queue entry and a scripted timeline of what happens to it |
+| `history.ts` | 12 past visits across the fall semester |
+
+- **Auth:** any valid email and password is accepted, and every account is a patient (`features/auth/authApi.ts`).
+- **Live queue demo:** the queue moves forward one step every 15 seconds, including an urgent case that pushes the patient back once, until they're served. Progress keeps going while you switch pages and starts over in a new tab. **Restart demo** on the Queue status page starts it again. Once it reaches Served, today's visit appears at the top of History.
+- **Wait estimate:** people ahead × the service's expected minutes per patient.
 
 ## Setup
 
