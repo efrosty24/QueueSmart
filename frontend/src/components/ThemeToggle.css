@@ -28,7 +28,7 @@
 }
 
 .theme-toggle__option[aria-checked='true'] {
-  background: var(--glass-bg-strong);
+  background: var(--surface-selected);
   color: var(--color-text);
   font-weight: 600;
 }

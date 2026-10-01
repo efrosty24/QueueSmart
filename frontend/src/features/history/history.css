@@ -1,0 +1,235 @@
+/* ---------- Summary tiles ---------- */
+
+.history-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0 0 var(--space-5);
+}
+
+.history-summary__item {
+  padding: var(--space-4) var(--space-5);
+}
+
+.history-summary__item dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.history-summary__item dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+/* ---------- Card + filters ---------- */
+
+.history-card {
+  padding: var(--space-6);
+}
+
+.history-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.history-card__header h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.history-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.history-filter {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.history-filter:hover {
+  background: var(--surface-subtle);
+  color: var(--color-text);
+}
+
+.history-filter[aria-pressed='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* ---------- Table ---------- */
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.history-table th {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.history-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--glass-border);
+  vertical-align: middle;
+}
+
+.history-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.history-table tbody tr:hover {
+  background: var(--surface-subtle);
+}
+
+.history-table time {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-date {
+  font-weight: 600;
+}
+
+.history-time,
+.history-ticket {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.history-ticket {
+  display: block;
+}
+
+.history-service {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-weight: 600;
+}
+
+.history-service__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-selected);
+  color: var(--color-primary);
+}
+
+.history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-10) var(--space-4);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.history-empty svg {
+  font-size: 2rem;
+}
+
+.history-empty p {
+  margin: 0;
+}
+
+/* ---------- Small screens: rows become cards ---------- */
+
+@media (max-width: 640px) {
+  .history-summary {
+    gap: var(--space-2);
+  }
+
+  .history-summary__item {
+    padding: var(--space-3);
+  }
+
+  .history-summary__item dd {
+    font-size: var(--text-lg);
+  }
+
+  .history-card {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .history-table thead {
+    display: none;
+  }
+
+  .history-table,
+  .history-table tbody,
+  .history-table tr,
+  .history-table td {
+    display: block;
+  }
+
+  .history-table tr {
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .history-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .history-table tbody tr:hover {
+    background: transparent;
+  }
+
+  .history-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-1) 0;
+    border-bottom: 0;
+  }
+
+  /* Column name on the left of each value. */
+  .history-table td::before {
+    content: attr(data-label);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .history-table time {
+    align-items: flex-end;
+  }
+
+  .history-service {
+    text-align: right;
+  }
+}
