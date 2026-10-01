@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { TextField } from '../../components/TextField'
+import { useForm } from '../../hooks/useForm'
 import { AuthLayout } from './AuthLayout'
 import { useAuth } from './AuthProvider'
 import { register } from './authApi'
-import { useAuthForm } from './useAuthForm'
 import { PASSWORD_MIN_LENGTH, validateRegister } from './validation'
 
 export function RegisterPage() {
@@ -12,7 +12,7 @@ export function RegisterPage() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
 
-  const { fieldProps, handleSubmit, submitting } = useAuthForm({
+  const { fieldProps, handleSubmit, submitting } = useForm({
     initialValues: { email: '', password: '', confirmPassword: '' },
     validate: validateRegister,
     onSubmit: async ({ email, password }) => {

@@ -103,7 +103,7 @@ It's built from these tokens, so tune the look here instead of in components:
 | `.btn` + `.btn-primary` / `.btn-ghost` / `.btn-danger` | Buttons. Add `.btn-block` for full width, `.btn-pill` for rounded ends. |
 | `.btn-danger-hover` | Quiet outline button that turns solid red on hover (sign out) |
 | `.badge` + `.badge-success` / `-warning` / `-danger` / `-neutral` / `-primary` | Small rounded status labels |
-| `.alert` + `.alert-error` / `.alert-success` | Inline status messages |
+| `.alert` + `.alert-error` / `.alert-success` / `.alert-warning` | Inline status messages |
 | `.visually-hidden` | Hidden on screen, still read by screen readers |
 
 ## Shared components
@@ -112,8 +112,9 @@ It's built from these tokens, so tune the look here instead of in components:
 |---|---|
 | `AppShell` | Wraps every signed-in route (set up in `App.tsx`). Pages render inside it. |
 | `PageHeader` | The title and description at the top of each signed-in page. |
-| `ConfirmDialog` | "Are you sure?" popups. Built on the native `<dialog>`, so focus trapping and Escape work automatically. |
-| `TextField` | Every text input (see below). |
+| `ConfirmDialog` | "Are you sure?" popups. Built on the native `<dialog>`, so focus trapping and Escape work automatically. Admin's own form dialogs (e.g. `ServiceFormDialog.tsx`) follow the same native-`<dialog>` pattern for a bigger form instead of a yes/no choice. |
+| `TextField` | Every text input. Handles the label, hint, error message, accessibility attributes and the password Show/Hide button. |
+| `TextArea` / `SelectField` | Multi-line text and fixed-choice siblings of `TextField` — all three share its stylesheet, so they always look consistent. |
 
 ## Icons
 
@@ -124,5 +125,3 @@ import { LuHistory } from 'react-icons/lu'
 
 <LuHistory aria-hidden="true" />
 ```
-
-For text inputs, use the `TextField` component (`src/components/TextField.tsx`). It handles the label, hint, error message, accessibility attributes and the password Show/Hide button.
