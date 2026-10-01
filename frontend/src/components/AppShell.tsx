@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { LuHistory, LuLayoutDashboard, LuListOrdered, LuLogOut, LuMenu, LuX } from 'react-icons/lu'
+import { LuHistory, LuLayoutDashboard, LuListOrdered, LuLogOut, LuMenu, LuPlus, LuX } from 'react-icons/lu'
 import { NavLink, Outlet, useNavigate } from 'react-router'
 import { useAuth } from '../features/auth/AuthProvider'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -10,6 +10,7 @@ import './AppShell.css'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LuLayoutDashboard },
+  { to: '/join-queue', label: 'Join queue', icon: LuPlus },
   { to: '/queue', label: 'Queue status', icon: LuListOrdered },
   { to: '/history', label: 'History', icon: LuHistory },
 ]

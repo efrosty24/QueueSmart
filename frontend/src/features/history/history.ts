@@ -1,7 +1,6 @@
-import { DEMO_STEP_MS, mockActiveQueue, mockQueueTimeline } from '../../mocks/activeQueue'
 import { mockHistory, type PastVisit, type VisitOutcome } from '../../mocks/history'
-import { deriveQueueState } from '../queue/queueStatus'
-import { peekDemoStart } from '../queue/useQueueStatus'
+import { loadSession } from '../auth/session'
+import { queueVisits } from '../queue/queueSession'
 
 export const outcomeLabels: Record<VisitOutcome, string> = {
   served: 'Served',
@@ -11,23 +10,8 @@ export const outcomeLabels: Record<VisitOutcome, string> = {
 
 // Past visits, newest first. Once the demo queue on the Queue status page
 // reaches "served", today's visit shows up here too.
-export function getHistory(now = Date.now()): PastVisit[] {
-  const visits = [...mockHistory]
-  const demoStart = peekDemoStart()
-
-  if (demoStart && deriveQueueState(demoStart, now).status === 'served') {
-    // Wait = how long the demo took to reach "served".
-    const demoMinutes = Math.max(1, Math.round(((mockQueueTimeline.length - 1) * DEMO_STEP_MS) / 60_000))
-    visits.push({
-      id: 'current-demo',
-      ticket: mockActiveQueue.ticket,
-      serviceId: mockActiveQueue.serviceId,
-      joinedAt: new Date(demoStart).toISOString(),
-      outcome: 'served',
-      waitedMinutes: demoMinutes,
-    })
-  }
-
+export function getHistory(now = Date.now(), email = loadSession()?.email ?? ''): PastVisit[] {
+  const visits = [...mockHistory, ...queueVisits(email, now)]
   return visits.sort((a, b) => Date.parse(b.joinedAt) - Date.parse(a.joinedAt))
 }
 

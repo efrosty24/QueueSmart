@@ -6,6 +6,7 @@ import { RegisterPage } from './features/auth/RegisterPage'
 import { RedirectIfSignedIn, RequireAuth } from './features/auth/RouteGuards'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { HistoryPage } from './features/history/HistoryPage'
+import { JoinQueuePage } from './features/join/JoinQueuePage'
 import { QueueStatusPage } from './features/queue/QueueStatusPage'
 import { ThemeProvider } from './theme/ThemeProvider'
 
@@ -22,6 +23,7 @@ export default function App() {
             <Route element={<RequireAuth />}>
               <Route element={<AppShell />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/join-queue" element={<JoinQueuePage />} />
                 <Route path="/queue" element={<QueueStatusPage />} />
                 <Route path="/history" element={<HistoryPage />} />
               </Route>

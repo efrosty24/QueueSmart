@@ -21,6 +21,7 @@ frontend/src/
 └── features/
     ├── auth/        # login, registration, validation, mock session, route guards
     ├── dashboard/   # overview: current queue + recent visits
+    ├── join/        # service selection, wait estimates, join/leave controls
     ├── queue/       # Queue status screen
     └── history/     # History screen
 ```
@@ -34,7 +35,8 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 - **Mock sign-in:** a valid login or registration signs the user in and redirects to **`/dashboard`**. The session is kept in the browser, so it survives a reload. **Sign out** clears it.
 - **Route guards:** signed-out users who open a signed-in page are sent to `/login`. Signed-in users who open `/login` or `/register` are sent to `/dashboard`.
 - **Sidebar layout** for signed-in pages, with Dashboard, Queue status and History. Below 900px it becomes a slide-in menu. **Sign out** is a pill that turns red on hover and asks for confirmation in a popup.
-- **Dashboard** (`/dashboard`): a snapshot of the current queue and the three most recent visits.
+- **Dashboard** (`/dashboard`): current queue, available campus clinic services and estimated waits, recent in-app notifications, and the three most recent visits.
+- **Join queue** (`/join-queue`): select an open service, preview its wait, and join. Students can have one active queue at a time. Leaving requires confirmation and records a Left queue visit in History.
 - **Queue status** (`/queue`): current position, estimated wait, people ahead, and status (Waiting → Almost ready → Served), with a feed of status updates.
 - **History** (`/history`): past queues with date, service, wait and outcome (Served, Left queue, No-show), summary totals, and an outcome filter.
 - Light, dark and system themes: red brand color on solid neutral backgrounds.
@@ -46,11 +48,13 @@ There is no backend yet, so everything runs on mock data in `frontend/src/mocks/
 | File | What it fakes |
 |---|---|
 | `services.ts` | Clinic services (Sick Visit, Flu Shot, Prescription Refill, Lab Work) and their expected minutes per patient |
+| `serviceQueues.ts` | Service descriptions, queue availability and sample numbers of students waiting |
 | `activeQueue.ts` | The patient's current queue entry and a scripted timeline of what happens to it |
 | `history.ts` | 12 past visits across the fall semester |
 
 - **Auth:** any valid email and password is accepted, and every account is a patient (`features/auth/authApi.ts`).
-- **Live queue demo:** the queue moves forward one step every 15 seconds, including an urgent case that pushes the patient back once, until they're served. Progress keeps going while you switch pages and starts over in a new tab. **Restart demo** on the Queue status page starts it again. Once it reaches Served, today's visit appears at the top of History.
+- **Queue state:** new students start without an active queue. Joining a service creates a mock ticket, and the queue advances every 15 seconds until Served. State survives navigation and reloads in the same tab and is separated by student email. Completed and left visits remain in that tab's History when another queue is joined.
+- **Live queue demo:** **Start queue demo** on an empty Queue status page runs the original Sick Visit timeline, including a staff-priority delay. **Restart demo** restarts the current timeline. Notifications use the same queue events as Queue status. This is accelerated sample data, not a real clinic queue.
 - **Wait estimate:** people ahead × the service's expected minutes per patient.
 
 ## Setup
@@ -82,7 +86,7 @@ npm install
 npm run dev      # http://localhost:5173
 ```
 
-Other scripts: `npm run build`, `npm run preview`, `npm run lint`.
+Other scripts: `npm run build`, `npm run preview`, `npm run lint`, `npm test` (mock queue state checks).
 
 ### Run with Docker
 

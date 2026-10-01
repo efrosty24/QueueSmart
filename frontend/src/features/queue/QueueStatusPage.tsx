@@ -38,6 +38,22 @@ const updateIcons: Record<QueueEventKind, IconType> = {
 export function QueueStatusPage() {
   const { queue, restartDemo } = useQueueStatus()
 
+  if (!queue) return (
+    <>
+      <PageHeader title="Queue status" description="Your place in line updates automatically." />
+      <section className="queue-card glass">
+        <h2 className="queue-card__title">You're not in a queue</h2>
+        <p>Select a campus clinic service to see its wait time and join the queue.</p>
+        <Link to="/join-queue" className="btn btn-primary">Find a clinic service</Link>
+      </section>
+      <p className="queue-demo-note">
+        <button type="button" className="btn btn-ghost btn-pill" onClick={restartDemo}>
+          <LuRefreshCw aria-hidden="true" /> Start queue demo
+        </button>
+      </p>
+    </>
+  )
+
   return (
     <>
       <PageHeader
