@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { LuTrash2 } from 'react-icons/lu'
 import { Link, useNavigate } from 'react-router'
 import { AppHeader } from '../../components/AppHeader'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -22,7 +23,9 @@ export function ServiceManagementPage() {
   const [error, setError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [editingService, setEditingService] = useState<Service | null>(null)
-  const [deletingService, setDeletingService] = useState<Service | null>(null)
+  // deleteTarget stays set while the dialog closes, so its message doesn't go blank mid-animation.
+  const [deleteTarget, setDeleteTarget] = useState<Service | null>(null)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
@@ -58,14 +61,14 @@ export function ServiceManagementPage() {
   }
 
   const handleDelete = async () => {
-    if (!deletingService) return
+    if (!deleteTarget) return
     setIsDeleting(true)
     try {
-      await deleteService(deletingService.id)
-      setServices((current) => current?.filter((service) => service.id !== deletingService.id) ?? current)
-      setDeletingService(null)
+      await deleteService(deleteTarget.id)
+      setServices((current) => current?.filter((service) => service.id !== deleteTarget.id) ?? current)
+      setIsDeleteOpen(false)
     } catch {
-      setError(`Could not delete ${deletingService.name}. Try again.`)
+      setError(`Could not delete ${deleteTarget.name}. Try again.`)
     } finally {
       setIsDeleting(false)
     }
@@ -123,7 +126,14 @@ export function ServiceManagementPage() {
                 <button type="button" className="btn btn-ghost" onClick={() => setEditingService(service)}>
                   Edit
                 </button>
-                <button type="button" className="btn btn-danger" onClick={() => setDeletingService(service)}>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => {
+                    setDeleteTarget(service)
+                    setIsDeleteOpen(true)
+                  }}
+                >
                   Delete
                 </button>
               </div>
@@ -136,16 +146,20 @@ export function ServiceManagementPage() {
       {editingService && (
         <ServiceFormDialog service={editingService} onClose={() => setEditingService(null)} onSubmit={handleUpdate} />
       )}
-      {deletingService && (
-        <ConfirmDialog
-          title="Delete service?"
-          message={`"${deletingService.name}" will be removed and patients will no longer be able to join its queue. This can't be undone.`}
-          confirmLabel="Delete"
-          pending={isDeleting}
-          onConfirm={handleDelete}
-          onCancel={() => setDeletingService(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={isDeleteOpen}
+        tone="danger"
+        icon={<LuTrash2 aria-hidden="true" />}
+        title="Delete service?"
+        message={
+          deleteTarget &&
+          `"${deleteTarget.name}" will be removed and patients will no longer be able to join its queue. This can't be undone.`
+        }
+        confirmLabel="Delete"
+        pending={isDeleting}
+        onConfirm={handleDelete}
+        onCancel={() => setIsDeleteOpen(false)}
+      />
     </div>
   )
 }

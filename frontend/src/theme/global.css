@@ -22,12 +22,6 @@ body {
   line-height: 1.5;
   color: var(--color-text);
   background-color: var(--color-bg);
-  /* Soft color blobs behind the glass so the frost has something to blur. */
-  background-image:
-    radial-gradient(40rem 40rem at 10% 10%, var(--color-bg-blob-1), transparent 60%),
-    radial-gradient(36rem 36rem at 90% 20%, var(--color-bg-blob-2), transparent 60%),
-    radial-gradient(44rem 44rem at 50% 100%, var(--color-bg-blob-3), transparent 60%);
-  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   transition:
     background-color var(--duration-base) var(--ease),
@@ -112,17 +106,8 @@ a:hover {
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: var(--glass-bg);
+  background: var(--surface-subtle);
   color: var(--color-text);
-}
-
-.btn-danger {
-  background: transparent;
-  color: var(--color-danger);
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: var(--color-danger-bg);
 }
 
 .btn-block {
@@ -147,69 +132,9 @@ a:hover {
   color: var(--color-success);
 }
 
-/* ---------- Dialog ---------- */
-
-.dialog-scrim {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: var(--space-4);
-  background: var(--scrim);
-  z-index: 10;
-}
-
-.dialog {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  width: 100%;
-  max-width: 28rem;
-  max-height: calc(100dvh - var(--space-8));
-  overflow-y: auto;
-  padding: var(--space-6);
-}
-
-.dialog__heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.dialog__heading h2 {
-  margin: 0;
-  font-size: var(--text-xl);
-}
-
-.dialog__close {
-  min-height: auto;
-  padding: var(--space-1) var(--space-2);
-}
-
-.dialog__message {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
-.dialog__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
-@media (max-width: 480px) {
-  .dialog {
-    padding: var(--space-5);
-  }
-
-  .dialog__actions {
-    flex-direction: column-reverse;
-  }
-
-  .dialog__actions .btn {
-    width: 100%;
-  }
+.alert-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
 }
 
 /* ---------- Helpers ---------- */
@@ -230,4 +155,69 @@ a:hover {
     transition-duration: 0ms !important;
     animation-duration: 0ms !important;
   }
+}
+
+/* ---------- Pills & badges ---------- */
+
+.btn-pill {
+  border-radius: var(--radius-full);
+}
+
+/* Quiet until hovered, then solid red. Used for sign out. */
+.btn-danger-hover {
+  border-color: var(--glass-border);
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.btn-danger-hover:hover:not(:disabled),
+.btn-danger-hover:focus-visible {
+  border-color: var(--color-danger-solid);
+  background: var(--color-danger-solid);
+  color: var(--color-on-danger);
+}
+
+.btn-danger {
+  background: var(--color-danger-solid);
+  color: var(--color-on-danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-danger-solid-hover);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge-success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.badge-danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.badge-neutral {
+  background: var(--surface-subtle);
+  color: var(--color-text-muted);
+}
+
+.badge-primary {
+  background: var(--surface-selected);
+  color: var(--color-primary);
 }

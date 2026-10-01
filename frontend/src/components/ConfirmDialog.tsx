@@ -1,64 +1,78 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
+import './ConfirmDialog.css'
 
 type ConfirmDialogProps = {
+  open: boolean
   title: string
-  message: string
+  message: ReactNode
   confirmLabel: string
   cancelLabel?: string
+  icon?: ReactNode
+  tone?: 'danger' | 'primary'
   pending?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
 
-// Generic "are you sure?" dialog for destructive actions. Reuses the shared
-// .dialog classes from global.css, so it matches ServiceFormDialog and others.
+// Small modal popup for "are you sure?" moments. Uses the native <dialog>,
+// which traps focus, closes on Escape and returns focus to the trigger.
 export function ConfirmDialog({
+  open,
   title,
   message,
   confirmLabel,
   cancelLabel = 'Cancel',
+  icon,
+  tone = 'primary',
   pending = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const messageId = useId()
 
-  // Close on Escape as a convenience; this isn't a full focus trap.
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel()
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onCancel])
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (open && !dialog.open) dialog.showModal()
+    if (!open && dialog.open) dialog.close()
+  }, [open])
 
   return (
-    <div
-      className="dialog-scrim"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onCancel()
+    <dialog
+      ref={dialogRef}
+      className="confirm-dialog glass"
+      aria-labelledby={titleId}
+      aria-describedby={messageId}
+      onCancel={(event) => {
+        // Escape key: let React state close it so `open` stays in sync.
+        event.preventDefault()
+        if (!pending) onCancel()
+      }}
+      onClick={(event) => {
+        // A click on the dialog element itself means the backdrop was clicked.
+        if (event.target === dialogRef.current && !pending) onCancel()
       }}
     >
-      <div className="dialog glass" role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={messageId}>
-        <div className="dialog__heading">
-          <h2 id={titleId}>{title}</h2>
-          <button type="button" className="btn btn-ghost dialog__close" onClick={onCancel} aria-label="Close">
-            ✕
-          </button>
-        </div>
-        <p id={messageId} className="dialog__message">
-          {message}
-        </p>
-        <div className="dialog__actions">
-          <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={pending}>
+      <div className="confirm-dialog__body">
+        {icon && <div className={`confirm-dialog__icon confirm-dialog__icon--${tone}`}>{icon}</div>}
+        <h2 id={titleId}>{title}</h2>
+        <p id={messageId}>{message}</p>
+        <div className="confirm-dialog__actions">
+          <button type="button" className="btn btn-ghost btn-pill" onClick={onCancel} disabled={pending} autoFocus>
             {cancelLabel}
           </button>
-          <button type="button" className="btn btn-danger" onClick={onConfirm} disabled={pending}>
+          <button
+            type="button"
+            className={`btn btn-pill ${tone === 'danger' ? 'btn-danger' : 'btn-primary'}`}
+            onClick={onConfirm}
+            disabled={pending}
+          >
             {pending ? 'Working…' : confirmLabel}
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   )
 }

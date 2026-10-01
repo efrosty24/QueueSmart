@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { SelectField } from '../../components/SelectField'
 import { TextArea } from '../../components/TextArea'
 import { TextField } from '../../components/TextField'
@@ -19,8 +19,11 @@ type ServiceFormDialogProps = {
 }
 
 // Shared create/edit form for a service, shown as a modal over the service list.
+// Uses the native <dialog>, same as ConfirmDialog, for a bigger form instead of a yes/no choice.
 export function ServiceFormDialog({ service, onClose, onSubmit }: ServiceFormDialogProps) {
   const [error, setError] = useState<string | null>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
   const isEditing = service !== null
 
   const { fieldProps, handleSubmit, submitting } = useForm<ServiceField>({
@@ -46,26 +49,38 @@ export function ServiceFormDialog({ service, onClose, onSubmit }: ServiceFormDia
     },
   })
 
-  // Close on Escape.
+  // This component is only ever mounted while the dialog should be open.
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+    const dialog = dialogRef.current
+    if (!dialog) return
+    dialog.showModal()
+    return () => dialog.close()
+  }, [])
 
   return (
-    <div
-      className="dialog-scrim"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
+    <dialog
+      ref={dialogRef}
+      className="service-form-dialog glass"
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        // Escape key: let React state close it instead of the dialog closing itself.
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={(event) => {
+        // A click on the dialog element itself means the backdrop was clicked.
+        if (event.target === dialogRef.current) onClose()
       }}
     >
-      <div className="dialog glass" role="dialog" aria-modal="true" aria-labelledby="service-form-title">
-        <div className="dialog__heading">
-          <h2 id="service-form-title">{isEditing ? 'Edit service' : 'Add service'}</h2>
-          <button type="button" className="btn btn-ghost dialog__close" onClick={onClose} aria-label="Close">
+      <div className="service-form-dialog__body">
+        <div className="service-form-dialog__heading">
+          <h2 id={titleId}>{isEditing ? 'Edit service' : 'Add service'}</h2>
+          <button
+            type="button"
+            className="btn btn-ghost service-form-dialog__close"
+            onClick={onClose}
+            aria-label="Close"
+          >
             ✕
           </button>
         </div>
@@ -98,16 +113,16 @@ export function ServiceFormDialog({ service, onClose, onSubmit }: ServiceFormDia
             {...fieldProps('durationMinutes')}
           />
           <SelectField label="Priority level" options={PRIORITY_OPTIONS} {...fieldProps('priority')} />
-          <div className="dialog__actions">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>
+          <div className="service-form-dialog__actions">
+            <button type="button" className="btn btn-ghost btn-pill" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
+            <button type="submit" className="btn btn-primary btn-pill" disabled={submitting}>
               {submitting ? 'Saving…' : isEditing ? 'Save changes' : 'Add service'}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </dialog>
   )
 }
