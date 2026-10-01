@@ -142,3 +142,16 @@
     padding: var(--space-5);
   }
 }
+
+.dashboard-empty-title { margin: 0; font-size: var(--text-xl); font-weight: 700; }
+.dashboard-card__header { flex-wrap: wrap; }
+.dashboard-card__header h2 { display: flex; align-items: center; gap: var(--space-2); }
+.dashboard-services, .dashboard-recent { grid-column: 1 / -1; }
+.dashboard-section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.dashboard-section-heading h2 { margin: 0 0 var(--space-1); font-size: var(--text-lg); }
+.dashboard-service-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+@media (max-width: 600px) {
+  .dashboard-service-grid { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-queue__stats { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-section-heading { align-items: start; }
+}

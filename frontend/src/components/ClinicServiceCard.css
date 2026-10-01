@@ -1,0 +1,24 @@
+.clinic-service {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  min-width: 0;
+}
+.clinic-service__header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.clinic-service__icon {
+  display: grid;
+  place-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-primary);
+  background: var(--surface-selected);
+  font-size: var(--text-xl);
+}
+.clinic-service h3 { margin: 0; font-size: var(--text-lg); }
+.clinic-service__description { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+.clinic-service__details { display: grid; gap: var(--space-2); margin: auto 0 0; padding-top: var(--space-3); font-size: var(--text-sm); }
+.clinic-service__details div { display: flex; justify-content: space-between; gap: var(--space-3); }
+.clinic-service__details dt { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-muted); }
+.clinic-service__details dd { margin: 0; font-weight: 600; text-align: right; }
+.clinic-service__action { padding-top: var(--space-3); }

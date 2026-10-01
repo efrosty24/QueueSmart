@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { LuInbox } from 'react-icons/lu'
 import { PageHeader } from '../../components/PageHeader'
 import { ServiceIcon } from '../../components/ServiceIcon'
 import { formatDate, formatMinutes, formatTime } from '../../lib/format'
 import type { VisitOutcome } from '../../mocks/history'
 import { services } from '../../mocks/services'
+import { useAuth } from '../auth/AuthProvider'
+import { useQueue } from '../queue/QueueProvider'
 import { getHistory, outcomeLabels, summarize } from './history'
 import { OutcomeBadge } from './OutcomeBadge'
 import './history.css'
@@ -19,8 +21,10 @@ const filters: { value: Filter; label: string }[] = [
 ]
 
 export function HistoryPage() {
-  // Read once per visit to the page; the list doesn't change while it's open.
-  const visits = useMemo(() => getHistory(), [])
+  const { user } = useAuth()
+  // Keep completed visits current even when this page stays open.
+  const { now } = useQueue()
+  const visits = getHistory(now, user?.email)
   const [filter, setFilter] = useState<Filter>('all')
   const summary = summarize(visits)
   const shown = filter === 'all' ? visits : visits.filter((visit) => visit.outcome === filter)

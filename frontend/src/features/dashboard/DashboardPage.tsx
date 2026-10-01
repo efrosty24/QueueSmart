@@ -1,8 +1,10 @@
-import { LuArrowRight, LuClock, LuUsers } from 'react-icons/lu'
+import { LuArrowRight, LuClock, LuPlus, LuUsers } from 'react-icons/lu'
 import { Link } from 'react-router'
+import { ClinicServiceCard } from '../../components/ClinicServiceCard'
 import { PageHeader } from '../../components/PageHeader'
 import { ServiceIcon } from '../../components/ServiceIcon'
 import { formatDate, formatMinutes } from '../../lib/format'
+import { serviceQueues } from '../../mocks/serviceQueues'
 import { services } from '../../mocks/services'
 import { useAuth } from '../auth/AuthProvider'
 import { getHistory } from '../history/history'
@@ -17,17 +19,14 @@ const RECENT_VISIT_COUNT = 3
 // Landing page after sign-in: current queue, recent visits, and notifications.
 export function DashboardPage() {
   const { user } = useAuth()
-  const { queue } = useQueue()
-
+  const { queue, now } = useQueue()
   // Read on every render so today's visit appears as soon as the queue finishes.
-  const recentVisits = getHistory().slice(0, RECENT_VISIT_COUNT)
+  const recentVisits = getHistory(now, user?.email).slice(0, RECENT_VISIT_COUNT)
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        description={user ? `Welcome back, ${user.email}` : undefined}
-      />
+      <PageHeader title="Dashboard" description={user ? `Welcome back, ${user.email}. Your campus clinic at a glance.` : undefined}
+        actions={<Link to="/join-queue" className="btn btn-primary"><LuPlus aria-hidden="true" /> Join a queue</Link>} />
 
       <div className="dashboard-grid">
         <section
@@ -36,9 +35,10 @@ export function DashboardPage() {
         >
           <div className="dashboard-card__header">
             <h2 id="dashboard-queue-title">Current queue</h2>
-            <QueueStatusBadge status={queue.status} />
+            {queue && <QueueStatusBadge status={queue.status} />}
           </div>
 
+          {queue ? <>
           <div className="dashboard-queue__service">
             <span className="dashboard-icon">
               <ServiceIcon serviceId={queue.service.id} />
@@ -85,12 +85,32 @@ export function DashboardPage() {
           <Link to="/queue" className="dashboard-link">
             View queue status <LuArrowRight aria-hidden="true" />
           </Link>
+          </> : <>
+            <p className="dashboard-empty-title">You're not in a queue</p>
+            <p className="dashboard-muted">Choose a clinic service below to check the wait and save your place in line.</p>
+            <Link to="/join-queue" className="dashboard-link">Find a clinic service <LuArrowRight aria-hidden="true" /></Link>
+          </>}
         </section>
 
-        <section
-          className="dashboard-card glass"
-          aria-labelledby="dashboard-history-title"
-        >
+        <NotificationsPanel preview />
+
+        <section className="dashboard-services" aria-labelledby="dashboard-services-title">
+          <div className="dashboard-section-heading">
+            <div><h2 id="dashboard-services-title">Clinic services</h2><p className="dashboard-muted">Browse available services and estimated waits.</p></div>
+            <span className="badge badge-success">{Object.values(serviceQueues).filter((service) => service.open).length} open</span>
+          </div>
+          <div className="dashboard-service-grid">
+            {Object.values(services).map((service) => (
+              <ClinicServiceCard key={service.id} serviceId={service.id}>
+                {serviceQueues[service.id].open
+                  ? <Link className="btn btn-ghost btn-block" to={`/join-queue?service=${service.id}`}>Select service <LuArrowRight aria-hidden="true" /></Link>
+                  : <p className="dashboard-muted">This queue is currently closed.</p>}
+              </ClinicServiceCard>
+            ))}
+          </div>
+        </section>
+
+        <section className="dashboard-card dashboard-recent glass" aria-labelledby="dashboard-history-title">
           <div className="dashboard-card__header">
             <h2 id="dashboard-history-title">Recent visits</h2>
           </div>
@@ -121,7 +141,6 @@ export function DashboardPage() {
           </Link>
         </section>
 
-        <NotificationsPanel preview />
       </div>
     </>
   )

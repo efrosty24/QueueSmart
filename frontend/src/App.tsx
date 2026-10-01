@@ -9,6 +9,7 @@ import { RegisterPage } from './features/auth/RegisterPage'
 import { RedirectIfSignedIn, RequireAdmin, RequireAuth } from './features/auth/RouteGuards'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { HistoryPage } from './features/history/HistoryPage'
+import { JoinQueuePage } from './features/join/JoinQueuePage'
 import { NotificationsPage } from './features/notifications/NotificationsPage'
 import { NotificationsProvider } from './features/notifications/NotificationsProvider'
 import { QueueProvider } from './features/queue/QueueProvider'
@@ -29,6 +30,7 @@ export default function App() {
             <Route element={<RequireAuth />}>
               <Route element={<SignedInLayout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/join-queue" element={<JoinQueuePage />} />
                 <Route path="/queue" element={<QueueStatusPage />} />
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />

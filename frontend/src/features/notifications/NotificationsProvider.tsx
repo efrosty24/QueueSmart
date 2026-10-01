@@ -37,8 +37,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { queue } = useQueue()
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set())
 
-  const ticket = `Ticket ${queue.ticket}`
-  const service = queue.service.name
+  const ticket = queue ? `Ticket ${queue.ticket}` : ''
+  const service = queue?.service.name ?? ''
 
   const adminMessages: Record<QueueEventKind, string> = {
     joined: `${ticket} joined the ${service} queue.`,
@@ -48,7 +48,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     served: `${ticket} was marked as served for ${service}.`,
   }
 
-  const notifications = queue.updates.map<AppNotification>((update) => {
+  const notifications = queue ? queue.updates.map<AppNotification>((update) => {
     const id = `${queue.joinedAt}:${queue.ticket}:${update.id}`
 
     return {
@@ -65,7 +65,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       at: update.at,
       read: readIds.has(id),
     }
-  })
+  }) : []
 
   const unreadCount = notifications.filter((item) => !item.read).length
 
