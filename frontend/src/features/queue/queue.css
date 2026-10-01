@@ -1,0 +1,319 @@
+.queue-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.queue-hero {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6);
+}
+
+.queue-card {
+  padding: var(--space-6);
+}
+
+.queue-card__title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-lg);
+}
+
+/* ---------- Hero ---------- */
+
+.queue-hero__service {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.queue-hero__service h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.queue-hero__service p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.queue-hero__service-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg-strong);
+  color: var(--color-primary);
+  font-size: 1.5rem;
+}
+
+.queue-stats {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.queue-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+}
+
+.queue-stat dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.queue-stat dd {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.queue-stat--position dd {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.queue-stat__big {
+  color: var(--color-primary);
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.queue-stat__sub {
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.queue-hero__served {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.queue-hero__served svg {
+  flex-shrink: 0;
+  font-size: 1.75rem;
+}
+
+.queue-hero__served p {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.queue-hero__callout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ---------- Progress steps ---------- */
+
+.queue-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-subtle);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Connector line to the next step. */
+.queue-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 1.25rem;
+  left: calc(50% + 1.5rem);
+  right: calc(-50% + 1.5rem);
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--field-border);
+}
+
+.queue-step--done:not(:last-child)::after {
+  background: var(--color-primary);
+}
+
+.queue-step__dot {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 2px solid var(--field-border);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  font-size: 1.125rem;
+  transition:
+    background-color var(--duration-base) var(--ease),
+    border-color var(--duration-base) var(--ease);
+}
+
+.queue-step--done {
+  color: var(--color-text-muted);
+}
+
+.queue-step--done .queue-step__dot {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.queue-step--current {
+  color: var(--color-text);
+}
+
+.queue-step--current .queue-step__dot {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: var(--focus-ring);
+}
+
+/* ---------- Updates ---------- */
+
+.queue-updates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 22rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.queue-update {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+/* Highlight the newest update. */
+.queue-update:first-child .queue-update__message {
+  font-weight: 600;
+}
+
+.queue-update__icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  background: var(--glass-bg-strong);
+  color: var(--color-primary);
+}
+
+.queue-update--delayed .queue-update__icon,
+.queue-update--almost-ready .queue-update__icon {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.queue-update--served .queue-update__icon {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.queue-update__message {
+  padding-top: var(--space-1);
+}
+
+.queue-update__time {
+  padding-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+/* ---------- Details ---------- */
+
+.queue-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.queue-details dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.queue-details dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ---------- Demo note ---------- */
+
+.queue-demo-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-6) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.queue-demo-note .btn {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+}
+
+@media (max-width: 720px) {
+  .queue-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .queue-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .queue-stat--position {
+    grid-column: 1 / -1;
+  }
+
+  .queue-stat dd {
+    font-size: var(--text-lg);
+  }
+
+  .queue-hero,
+  .queue-card {
+    padding: var(--space-5);
+  }
+}
