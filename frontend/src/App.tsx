@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { AppShell } from './components/AppShell'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
@@ -17,7 +18,9 @@ export default function App() {
               <Route path="/register" element={<RegisterPage />} />
             </Route>
             <Route element={<RequireAuth />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route element={<AppShell />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+              </Route>
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

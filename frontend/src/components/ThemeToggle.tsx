@@ -1,11 +1,13 @@
+import type { IconType } from 'react-icons'
+import { LuMonitor, LuMoon, LuSun } from 'react-icons/lu'
 import { useTheme } from '../theme/ThemeProvider'
 import type { ThemePreference } from '../theme/theme'
 import './ThemeToggle.css'
 
-const options: { value: ThemePreference; label: string; icon: string }[] = [
-  { value: 'light', label: 'Light', icon: '☀' },
-  { value: 'system', label: 'System', icon: '◐' },
-  { value: 'dark', label: 'Dark', icon: '☾' },
+const options: { value: ThemePreference; label: string; icon: IconType }[] = [
+  { value: 'light', label: 'Light', icon: LuSun },
+  { value: 'system', label: 'System', icon: LuMonitor },
+  { value: 'dark', label: 'Dark', icon: LuMoon },
 ]
 
 export function ThemeToggle() {
@@ -13,18 +15,18 @@ export function ThemeToggle() {
 
   return (
     <div className="theme-toggle glass" role="radiogroup" aria-label="Color theme">
-      {options.map((option) => (
+      {options.map(({ value, label, icon: Icon }) => (
         <button
-          key={option.value}
+          key={value}
           type="button"
           role="radio"
-          aria-checked={preference === option.value}
+          aria-checked={preference === value}
           className="theme-toggle__option"
-          onClick={() => setPreference(option.value)}
-          title={option.label}
+          onClick={() => setPreference(value)}
+          title={label}
         >
-          <span aria-hidden="true">{option.icon}</span>
-          <span className="theme-toggle__label">{option.label}</span>
+          <Icon aria-hidden="true" />
+          <span className="theme-toggle__label">{label}</span>
         </button>
       ))}
     </div>

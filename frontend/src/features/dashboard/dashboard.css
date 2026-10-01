@@ -1,26 +1,11 @@
-.dashboard-page {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  min-height: 100dvh;
-  padding: var(--space-4);
-}
-
-.dashboard-page__main {
-  width: 100%;
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: var(--space-10) 0;
-}
-
 .dashboard-welcome {
   max-width: 40rem;
   padding: var(--space-8);
 }
 
-.dashboard-welcome h1 {
+.dashboard-welcome h2 {
   margin: 0 0 var(--space-3);
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   line-height: 1.2;
 }
 
@@ -33,21 +18,12 @@
   text-transform: uppercase;
 }
 
-.dashboard-welcome__email {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
 .dashboard-welcome__note {
-  margin: var(--space-4) 0 0;
+  margin: 0;
   color: var(--color-text-muted);
 }
 
 @media (max-width: 480px) {
-  .dashboard-page__main {
-    padding: var(--space-6) 0;
-  }
-
   .dashboard-welcome {
     padding: var(--space-6) var(--space-5);
   }

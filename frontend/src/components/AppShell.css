@@ -1,0 +1,208 @@
+.app-shell {
+  --sidebar-width: 16rem;
+
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  gap: var(--space-6);
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--space-4);
+}
+
+.app-shell__topbar {
+  display: none;
+}
+
+/* ---------- Sidebar ---------- */
+
+.sidebar {
+  position: sticky;
+  top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  height: calc(100dvh - 2 * var(--space-4));
+  padding: var(--space-5) var(--space-4);
+  overflow-y: auto;
+}
+
+.sidebar__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-2);
+}
+
+.sidebar .sidebar__close {
+  display: none;
+}
+
+.sidebar__nav ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.sidebar__link:hover {
+  background: var(--glass-bg);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.sidebar__link.active {
+  background: var(--glass-bg-strong);
+  color: var(--color-primary);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.sidebar__link-icon {
+  flex-shrink: 0;
+  font-size: 1.25rem;
+}
+
+.sidebar__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--glass-border);
+}
+
+.sidebar__footer .theme-toggle {
+  align-self: stretch;
+}
+
+/* Compact toggle so all three options fit the sidebar width. */
+.sidebar__footer .theme-toggle__option {
+  flex: 1;
+  justify-content: center;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.sidebar__user {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.sidebar__user-label {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.sidebar__user-email {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar__signout {
+  min-height: 40px;
+}
+
+/* ---------- Main ---------- */
+
+.app-shell__main {
+  min-width: 0;
+  padding: var(--space-4) 0 var(--space-10);
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 1.375rem;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--glass-bg);
+}
+
+/* ---------- Small screens: drawer ---------- */
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+    /* Top bar keeps its natural height; the page takes the rest. */
+    grid-template-rows: auto 1fr;
+    gap: var(--space-4);
+  }
+
+  .app-shell__topbar {
+    position: sticky;
+    top: var(--space-2);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+    border-radius: var(--radius-lg);
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: var(--space-2) auto var(--space-2) var(--space-2);
+    z-index: 30;
+    width: min(var(--sidebar-width), calc(100vw - 4rem));
+    height: auto;
+    background: var(--glass-bg-strong);
+    /* Hidden drawers must not be reachable by keyboard; visibility handles that. */
+    visibility: hidden;
+    transform: translateX(calc(-100% - var(--space-4)));
+    transition:
+      transform var(--duration-base) var(--ease),
+      visibility var(--duration-base) var(--ease);
+  }
+
+  .sidebar.is-open {
+    visibility: visible;
+    transform: none;
+    /* Become visible at once on open so focus can move into the drawer. */
+    transition: transform var(--duration-base) var(--ease);
+  }
+
+  .sidebar .sidebar__close {
+    display: grid;
+  }
+
+  .app-shell__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    background: var(--overlay-bg);
+  }
+
+  .app-shell__main {
+    padding-top: 0;
+  }
+}

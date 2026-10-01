@@ -11,7 +11,8 @@ QueueSmart uses one set of CSS variables (design tokens) for every color, glass 
 | `src/theme/theme.ts` | Reads/saves the user's choice and applies it to `<html data-theme>`. |
 | `src/theme/ThemeProvider.tsx` | React context. Exposes `useTheme()`. |
 | `src/components/ThemeToggle.tsx` | The Light / System / Dark switch. |
-| `src/components/AppHeader.tsx` | Top bar with the brand and theme switch. Use it on every page; pass extra buttons through `actions`. |
+| `src/components/AppHeader.tsx` | Top bar for signed-out pages (login, register). |
+| `src/components/AppShell.tsx` | Layout for signed-in pages: sidebar with navigation, theme switch and sign out. Becomes a slide-in drawer below 900px. |
 | `index.html` | Small inline script that applies the saved theme before first paint, so there's no flash. |
 
 ## Rules
@@ -71,8 +72,11 @@ Glass only looks frosted when there's something colorful behind it. The page bac
 | `--color-text-muted` | Secondary text, hints |
 | `--color-text-subtle` | Placeholders |
 | `--color-bg` | Page background |
-| `--color-danger` / `--color-danger-bg` | Errors |
+| `--color-danger` / `--color-danger-bg` | Error text and tinted error backgrounds |
+| `--color-danger-solid` / `--color-danger-solid-hover` / `--color-on-danger` | Solid red buttons (sign out on hover, destructive confirms) |
+| `--color-warning` / `--color-warning-bg` | "Almost ready" and other heads-up states |
 | `--color-success` / `--color-success-bg` | Success messages |
+| `--overlay-bg` | Dimmed backdrop behind dialogs and the mobile drawer |
 
 **Form fields:** `--field-bg`, `--field-border`, `--field-border-focus`, `--focus-ring`
 
@@ -89,8 +93,29 @@ Glass only looks frosted when there's something colorful behind it. The page bac
 | Class | What it is |
 |---|---|
 | `.glass` | Frosted panel |
-| `.btn` + `.btn-primary` / `.btn-ghost` | Buttons (add `.btn-block` for full width) |
+| `.btn` + `.btn-primary` / `.btn-ghost` / `.btn-danger` | Buttons. Add `.btn-block` for full width, `.btn-pill` for rounded ends. |
+| `.btn-danger-hover` | Quiet outline button that turns solid red on hover (sign out) |
+| `.badge` + `.badge-success` / `-warning` / `-danger` / `-neutral` / `-primary` | Small rounded status labels |
 | `.alert` + `.alert-error` / `.alert-success` | Inline status messages |
 | `.visually-hidden` | Hidden on screen, still read by screen readers |
+
+## Shared components
+
+| Component | Use for |
+|---|---|
+| `AppShell` | Wraps every signed-in route (set up in `App.tsx`). Pages render inside it. |
+| `PageHeader` | The title and description at the top of each signed-in page. |
+| `ConfirmDialog` | "Are you sure?" popups. Built on the native `<dialog>`, so focus trapping and Escape work automatically. |
+| `TextField` | Every text input (see below). |
+
+## Icons
+
+Use [React Icons](https://react-icons.github.io/react-icons/), Lucide set only (`react-icons/lu`), so icons share one style. Mark decorative icons `aria-hidden="true"`; an icon-only button needs an `aria-label`.
+
+```tsx
+import { LuHistory } from 'react-icons/lu'
+
+<LuHistory aria-hidden="true" />
+```
 
 For text inputs, use the `TextField` component (`src/components/TextField.tsx`). It handles the label, hint, error message, accessibility attributes and the password Show/Hide button.
