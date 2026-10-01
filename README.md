@@ -86,7 +86,7 @@ npm install
 npm run dev      # http://localhost:5173
 ```
 
-Other scripts: `npm run build`, `npm run preview`, `npm run lint`, `npm test` (mock queue state checks).
+Other scripts: `npm run build`, `npm run preview`, `npm run lint`.
 
 ### Run with Docker
 
