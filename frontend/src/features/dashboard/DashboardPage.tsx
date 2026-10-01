@@ -1,27 +1,27 @@
-import { LuArrowRight, LuBell, LuClock, LuPlus, LuUsers } from 'react-icons/lu'
+import { LuArrowRight, LuClock, LuPlus, LuUsers } from 'react-icons/lu'
 import { Link } from 'react-router'
 import { ClinicServiceCard } from '../../components/ClinicServiceCard'
 import { PageHeader } from '../../components/PageHeader'
 import { ServiceIcon } from '../../components/ServiceIcon'
-import { formatDate, formatMinutes, formatTime } from '../../lib/format'
+import { formatDate, formatMinutes } from '../../lib/format'
 import { serviceQueues } from '../../mocks/serviceQueues'
 import { services } from '../../mocks/services'
 import { useAuth } from '../auth/AuthProvider'
 import { getHistory } from '../history/history'
 import { OutcomeBadge } from '../history/OutcomeBadge'
+import { NotificationsPanel } from '../notifications/NotificationsPanel'
+import { useQueue } from '../queue/QueueProvider'
 import { QueueStatusBadge } from '../queue/QueueStatusBadge'
-import { useQueueStatus } from '../queue/useQueueStatus'
 import './dashboard.css'
 
 const RECENT_VISIT_COUNT = 3
 
-// Landing page after sign-in: a snapshot of the current queue and recent visits.
+// Landing page after sign-in: current queue, recent visits, and notifications.
 export function DashboardPage() {
   const { user } = useAuth()
-  const { queue, now } = useQueueStatus()
+  const { queue, now } = useQueue()
   // Read on every render so today's visit appears as soon as the queue finishes.
   const recentVisits = getHistory(now, user?.email).slice(0, RECENT_VISIT_COUNT)
-  const notifications = queue?.updates.slice(0, 3) ?? []
 
   return (
     <>
@@ -29,7 +29,10 @@ export function DashboardPage() {
         actions={<Link to="/join-queue" className="btn btn-primary"><LuPlus aria-hidden="true" /> Join a queue</Link>} />
 
       <div className="dashboard-grid">
-        <section className="dashboard-card glass" aria-labelledby="dashboard-queue-title">
+        <section
+          className="dashboard-card glass"
+          aria-labelledby="dashboard-queue-title"
+        >
           <div className="dashboard-card__header">
             <h2 id="dashboard-queue-title">Current queue</h2>
             {queue && <QueueStatusBadge status={queue.status} />}
@@ -47,19 +50,29 @@ export function DashboardPage() {
           </div>
 
           {queue.status === 'served' ? (
-            <p className="dashboard-muted">You've been served. Thanks for visiting!</p>
+            <p className="dashboard-muted">
+              You've been served. Thanks for visiting!
+            </p>
           ) : (
             <dl className="dashboard-queue__stats">
               <div>
                 <dt>Position</dt>
-                <dd className="dashboard-queue__position">#{queue.position}</dd>
+                <dd className="dashboard-queue__position">
+                  #{queue.position}
+                </dd>
               </div>
+
               <div>
                 <dt>
                   <LuClock aria-hidden="true" /> Wait
                 </dt>
-                <dd>{queue.peopleAhead === 0 ? "You're next" : `~${formatMinutes(queue.estimatedWaitMinutes)}`}</dd>
+                <dd>
+                  {queue.peopleAhead === 0
+                    ? "You're next"
+                    : `~${formatMinutes(queue.estimatedWaitMinutes)}`}
+                </dd>
               </div>
+
               <div>
                 <dt>
                   <LuUsers aria-hidden="true" /> Ahead
@@ -79,24 +92,7 @@ export function DashboardPage() {
           </>}
         </section>
 
-        <section className="dashboard-card glass" aria-labelledby="dashboard-notifications-title">
-          <div className="dashboard-card__header">
-            <h2 id="dashboard-notifications-title"><LuBell aria-hidden="true" /> Notifications</h2>
-            <span className="badge badge-neutral">{notifications.length} recent</span>
-          </div>
-          {notifications.length ? <>
-            <ul className="dashboard-notifications">
-              {notifications.map((notification) => (
-                <li key={notification.id}>
-                  <p>{notification.message}</p>
-                  <time dateTime={new Date(notification.at).toISOString()}>{formatTime(notification.at)}</time>
-                </li>
-              ))}
-            </ul>
-            <p className="visually-hidden" aria-live="polite">{notifications[0].message}</p>
-            <Link to="/queue" className="dashboard-link">All queue updates <LuArrowRight aria-hidden="true" /></Link>
-          </> : <p className="dashboard-muted">You're all caught up. Join a queue to receive position, wait and visit updates here.</p>}
-        </section>
+        <NotificationsPanel preview />
 
         <section className="dashboard-services" aria-labelledby="dashboard-services-title">
           <div className="dashboard-section-heading">
@@ -125,10 +121,16 @@ export function DashboardPage() {
                 <span className="dashboard-icon dashboard-icon--small">
                   <ServiceIcon serviceId={visit.serviceId} />
                 </span>
+
                 <span className="dashboard-visit__text">
-                  <span className="dashboard-visit__name">{services[visit.serviceId].name}</span>
-                  <span className="dashboard-muted">{formatDate(new Date(visit.joinedAt))}</span>
+                  <span className="dashboard-visit__name">
+                    {services[visit.serviceId].name}
+                  </span>
+                  <span className="dashboard-muted">
+                    {formatDate(new Date(visit.joinedAt))}
+                  </span>
                 </span>
+
                 <OutcomeBadge outcome={visit.outcome} />
               </li>
             ))}
@@ -138,6 +140,7 @@ export function DashboardPage() {
             See all history <LuArrowRight aria-hidden="true" />
           </Link>
         </section>
+
       </div>
     </>
   )

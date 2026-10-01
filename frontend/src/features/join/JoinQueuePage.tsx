@@ -8,7 +8,7 @@ import { formatMinutes } from '../../lib/format'
 import { serviceQueues } from '../../mocks/serviceQueues'
 import { services, type ServiceId } from '../../mocks/services'
 import { QueueStatusBadge } from '../queue/QueueStatusBadge'
-import { useQueueStatus } from '../queue/useQueueStatus'
+import { useQueue } from '../queue/QueueProvider'
 import './join.css'
 
 export function JoinQueuePage() {
@@ -20,7 +20,7 @@ export function JoinQueuePage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [confirmLeave, setConfirmLeave] = useState(false)
-  const { queue, joinQueue, leaveQueue } = useQueueStatus()
+  const { queue, joinQueue, leaveQueue } = useQueue()
   const active = queue && queue.status !== 'served'
 
   function handleJoin(event: FormEvent) {

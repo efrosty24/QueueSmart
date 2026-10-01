@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { after, test } from 'node:test'
 import { createServer } from 'vite'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 // Load the actual TypeScript modules through the project's existing Vite dependency.
 const server = await createServer({ configFile: false, server: { middlewareMode: true }, appType: 'custom' })
@@ -82,4 +84,45 @@ test('mock demo remains available and preserves the priority-delay timeline', ()
   const queue = deriveQueueState(entry.joinedAt, entry.joinedAt + 30_000, entry)
   assert.equal(queue.updates[0].kind, 'delayed')
   assert.equal(queue.position, 5)
+})
+
+test('merged providers handle empty, joined, left and served queues consistently', async () => {
+  const { AuthProvider } = await server.ssrLoadModule('/src/features/auth/AuthProvider.tsx')
+  const { QueueProvider, useQueue } = await server.ssrLoadModule('/src/features/queue/QueueProvider.tsx')
+  const { NotificationsProvider, useNotifications } =
+    await server.ssrLoadModule('/src/features/notifications/NotificationsProvider.tsx')
+  const email = 'notifications@example.test'
+  globalThis.localStorage = {
+    getItem: (key) => key === 'queuesmart-session' ? JSON.stringify({ email, role: 'patient' }) : null,
+  }
+
+  function snapshot() {
+    let result
+    function Probe() {
+      const { queue } = useQueue()
+      const { notifications, unreadCount } = useNotifications()
+      result = { queue, notifications, unreadCount }
+      return null
+    }
+    renderToStaticMarkup(createElement(AuthProvider, null,
+      createElement(QueueProvider, null, createElement(NotificationsProvider, null, createElement(Probe)))))
+    return result
+  }
+
+  assert.equal(snapshot().queue, null)
+  assert.equal(snapshot().unreadCount, 0)
+  const now = Date.now()
+  joinService(email, 'flu-shot', now)
+  const joined = snapshot()
+  assert.equal(joined.queue.service.id, 'flu-shot')
+  assert.equal(joined.unreadCount, 1)
+  assert.match(joined.notifications[0].message, /Flu Shot/)
+  leaveService(email, now + 1)
+  assert.equal(snapshot().queue, null)
+  assert.deepEqual(snapshot().notifications, [])
+  joinService(email, 'sick-visit', now - 150_000)
+  const served = snapshot()
+  assert.equal(served.queue.status, 'served')
+  assert.equal(served.notifications[0].title, 'Served')
+  assert.match(served.notifications[0].message, /Sick Visit/)
 })

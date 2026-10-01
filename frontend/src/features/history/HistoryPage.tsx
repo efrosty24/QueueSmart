@@ -6,7 +6,7 @@ import { formatDate, formatMinutes, formatTime } from '../../lib/format'
 import type { VisitOutcome } from '../../mocks/history'
 import { services } from '../../mocks/services'
 import { useAuth } from '../auth/AuthProvider'
-import { useQueueStatus } from '../queue/useQueueStatus'
+import { useQueue } from '../queue/QueueProvider'
 import { getHistory, outcomeLabels, summarize } from './history'
 import { OutcomeBadge } from './OutcomeBadge'
 import './history.css'
@@ -23,7 +23,7 @@ const filters: { value: Filter; label: string }[] = [
 export function HistoryPage() {
   const { user } = useAuth()
   // Keep completed visits current even when this page stays open.
-  const { now } = useQueueStatus()
+  const { now } = useQueue()
   const visits = getHistory(now, user?.email)
   const [filter, setFilter] = useState<Filter>('all')
   const summary = summarize(visits)

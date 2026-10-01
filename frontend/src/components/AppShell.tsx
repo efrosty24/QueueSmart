@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { LuHistory, LuLayoutDashboard, LuListOrdered, LuLogOut, LuMenu, LuPlus, LuX } from 'react-icons/lu'
+import { LuBell, LuHistory, LuLayoutDashboard, LuListOrdered, LuLogOut, LuMenu, LuPlus, LuX } from 'react-icons/lu'
 import { NavLink, Outlet, useNavigate } from 'react-router'
 import { useAuth } from '../features/auth/AuthProvider'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ThemeToggle } from './ThemeToggle'
+import { useNotifications } from '../features/notifications/NotificationsProvider'
 // Brand styles (.app-brand) are shared with the signed-out header.
 import './AppHeader.css'
 import './AppShell.css'
@@ -13,12 +14,14 @@ const navItems = [
   { to: '/join-queue', label: 'Join queue', icon: LuPlus },
   { to: '/queue', label: 'Queue status', icon: LuListOrdered },
   { to: '/history', label: 'History', icon: LuHistory },
+  { to: '/notifications', label: 'Notifications', icon: LuBell },
 ]
 
 // Layout for every signed-in page: sidebar on the left, page content on the right.
 // Below 900px the sidebar becomes a slide-in drawer opened from the top bar.
 export function AppShell() {
   const { user, signOut } = useAuth()
+  const { unreadCount } = useNotifications()
   const navigate = useNavigate()
   const [navOpen, setNavOpen] = useState(false)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
@@ -74,9 +77,20 @@ export function AppShell() {
           <ul>
             {navItems.map(({ to, label, icon: Icon }) => (
               <li key={to}>
-                <NavLink to={to} className="sidebar__link" onClick={() => setNavOpen(false)}>
+                <NavLink
+                  to={to}
+                  className="sidebar__link"
+                  onClick={() => setNavOpen(false)}
+                >
                   <Icon aria-hidden="true" className="sidebar__link-icon" />
                   {label}
+
+                  {to === '/notifications' && unreadCount > 0 && (
+                    <span className="badge badge-primary sidebar__notification-count">
+                      {unreadCount}
+                      <span className="visually-hidden"> unread notifications</span>
+                    </span>
+                  )}
                 </NavLink>
               </li>
             ))}
