@@ -40,7 +40,7 @@
 }
 
 .confirm-dialog__icon--primary {
-  background: var(--glass-bg);
+  background: var(--surface-selected);
   color: var(--color-primary);
 }
 

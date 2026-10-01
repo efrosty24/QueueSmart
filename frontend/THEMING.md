@@ -2,6 +2,8 @@
 
 QueueSmart uses one set of CSS variables (design tokens) for every color, glass effect, spacing value and font size. Light, dark and system modes all come from the same tokens, so components never need to know which mode is active.
 
+The look: **red brand color** on **solid neutral backgrounds**, with slightly translucent panels.
+
 ## Files
 
 | File | What it holds |
@@ -17,7 +19,7 @@ QueueSmart uses one set of CSS variables (design tokens) for every color, glass 
 
 ## Rules
 
-1. **Use tokens, never raw colors.** Write `color: var(--color-text-muted)`, not `color: #475569`. Raw hex values belong only in `tokens.css`.
+1. **Use tokens, never raw colors.** Write `color: var(--color-text-muted)`, not `color: #52525b`. Raw hex values belong only in `tokens.css`.
 2. **New token? Add it to both blocks** in `tokens.css` (light and dark), then list it below.
 3. **Panels use `.glass`.** Don't rebuild the frosted effect per component.
 4. **Spacing uses the 4px scale** (`--space-*`). Avoid one-off pixel values.
@@ -37,9 +39,9 @@ const { preference, resolvedTheme, setPreference } = useTheme()
 setPreference('dark')
 ```
 
-## Glass (frosted look)
+## Panels (`.glass`)
 
-`.glass` gives a translucent, blurred panel with a light border and soft shadow:
+`.glass` gives a slightly translucent panel with a thin border and soft shadow. The page background is a solid color, so panels read as clean cards; the blur only shows where content scrolls underneath (the mobile top bar and menu):
 
 ```tsx
 <section className="glass">…</section>
@@ -50,14 +52,19 @@ It's built from these tokens, so tune the look here instead of in components:
 | Token | Purpose |
 |---|---|
 | `--glass-bg` | Panel fill (translucent) |
-| `--glass-bg-strong` | More opaque fill, for selected states and browsers without blur |
+| `--glass-bg-strong` | Near-solid fill for dialogs, the mobile menu, and browsers without blur |
 | `--glass-border` | Thin edge around the panel |
 | `--glass-highlight` | Inner top highlight |
 | `--glass-blur` | Blur amount (default `20px`) |
 | `--glass-saturate` | Color boost behind the panel |
 | `--glass-shadow` | Drop shadow |
 
-Glass only looks frosted when there's something colorful behind it. The page background in `global.css` draws soft color blobs (`--color-bg-blob-1..3`) for that.
+**Inside a panel**, don't reuse `--glass-bg` (it would vanish against the panel). Use the surface tints instead:
+
+| Token | Use for |
+|---|---|
+| `--surface-subtle` | Faint gray tint: stat tiles, row and button hover states |
+| `--surface-selected` | Faint red tint: active nav item, selected toggle, icon chips |
 
 ## Token reference
 
@@ -65,13 +72,13 @@ Glass only looks frosted when there's something colorful behind it. The page bac
 
 | Token | Use for |
 |---|---|
-| `--color-primary` / `--color-primary-hover` | Main actions, links, brand mark |
+| `--color-primary` / `--color-primary-hover` | Brand red: main actions, links, brand mark, active states |
 | `--color-on-primary` | Text on top of primary |
-| `--color-accent` | Secondary highlight |
 | `--color-text` | Body text |
 | `--color-text-muted` | Secondary text, hints |
 | `--color-text-subtle` | Placeholders |
-| `--color-bg` | Page background |
+| `--color-bg` | Page background (solid) |
+| `--surface-subtle` / `--surface-selected` | Tints inside panels (see Panels above) |
 | `--color-danger` / `--color-danger-bg` | Error text and tinted error backgrounds |
 | `--color-danger-solid` / `--color-danger-solid-hover` / `--color-on-danger` | Solid red buttons (sign out on hover, destructive confirms) |
 | `--color-warning` / `--color-warning-bg` | "Almost ready" and other heads-up states |

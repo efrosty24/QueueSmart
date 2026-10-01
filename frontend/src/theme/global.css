@@ -22,12 +22,6 @@ body {
   line-height: 1.5;
   color: var(--color-text);
   background-color: var(--color-bg);
-  /* Soft color blobs behind the glass so the frost has something to blur. */
-  background-image:
-    radial-gradient(40rem 40rem at 10% 10%, var(--color-bg-blob-1), transparent 60%),
-    radial-gradient(36rem 36rem at 90% 20%, var(--color-bg-blob-2), transparent 60%),
-    radial-gradient(44rem 44rem at 50% 100%, var(--color-bg-blob-3), transparent 60%);
-  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   transition:
     background-color var(--duration-base) var(--ease),
@@ -112,7 +106,7 @@ a:hover {
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: var(--glass-bg);
+  background: var(--surface-subtle);
   color: var(--color-text);
 }
 
@@ -219,11 +213,11 @@ a:hover {
 }
 
 .badge-neutral {
-  background: var(--glass-bg-strong);
+  background: var(--surface-subtle);
   color: var(--color-text-muted);
 }
 
 .badge-primary {
-  background: var(--glass-bg-strong);
+  background: var(--surface-selected);
   color: var(--color-primary);
 }

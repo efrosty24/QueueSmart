@@ -62,13 +62,13 @@
 }
 
 .sidebar__link:hover {
-  background: var(--glass-bg);
+  background: var(--surface-subtle);
   color: var(--color-text);
   text-decoration: none;
 }
 
 .sidebar__link.active {
-  background: var(--glass-bg-strong);
+  background: var(--surface-selected);
   color: var(--color-primary);
   box-shadow: inset 3px 0 0 var(--color-primary);
 }
@@ -145,7 +145,7 @@
 }
 
 .icon-button:hover {
-  background: var(--glass-bg);
+  background: var(--surface-subtle);
 }
 
 /* ---------- Small screens: drawer ---------- */

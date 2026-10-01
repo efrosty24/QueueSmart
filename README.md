@@ -14,7 +14,7 @@ QueueSmart/
 
 ```
 frontend/src/
-├── theme/           # design tokens, glass styles, light/dark/system logic
+├── theme/           # design tokens, panel styles, light/dark/system logic
 ├── components/      # shared UI (AppShell sidebar, ConfirmDialog, PageHeader, TextField, ...)
 ├── lib/             # small helpers (date/time formatting)
 ├── mocks/           # mock data: services, live queue timeline, visit history
@@ -37,7 +37,7 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 - **Dashboard** (`/dashboard`): a snapshot of the current queue and the three most recent visits.
 - **Queue status** (`/queue`): current position, estimated wait, people ahead, and status (Waiting → Almost ready → Served), with a feed of status updates.
 - **History** (`/history`): past queues with date, service, wait and outcome (Served, Left queue, No-show), summary totals, and an outcome filter.
-- Light, dark and system themes with a frosted-glass look.
+- Light, dark and system themes: red brand color on solid neutral backgrounds.
 
 ### Mock data
 
@@ -135,7 +135,7 @@ export function RequireRole({ role }: { role: Role }) {
 export const homePathFor = (user: SessionUser) => (user.role === 'admin' ? '/admin' : '/dashboard')
 ```
 
-**4. Create a placeholder admin page.** Add `features/admin/AdminDashboardPage.tsx`, built like `DashboardPage`: `<AppHeader>` with a Sign out action, and a `.glass` card saying "Admin dashboard (coming soon)". Follow [THEMING.md](frontend/THEMING.md) for styles.
+**4. Create a placeholder admin page.** Add `features/admin/AdminDashboardPage.tsx`, built like `DashboardPage`: a `<PageHeader>` and a `.glass` card saying "Admin dashboard (coming soon)". Nest its route inside the `<AppShell />` route so it gets the sidebar, and add an Admin link to `navItems` in `AppShell.tsx` (shown only when `user.role === 'admin'`). Follow [THEMING.md](frontend/THEMING.md) for styles.
 
 **5. Register the route** in `App.tsx`, nested so it needs both a session and the admin role:
 

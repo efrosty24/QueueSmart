@@ -46,7 +46,7 @@
   width: 3rem;
   height: 3rem;
   border-radius: var(--radius-md);
-  background: var(--glass-bg-strong);
+  background: var(--surface-selected);
   color: var(--color-primary);
   font-size: 1.5rem;
 }
@@ -65,7 +65,7 @@
   gap: var(--space-1);
   padding: var(--space-4);
   border-radius: var(--radius-md);
-  background: var(--glass-bg);
+  background: var(--surface-subtle);
 }
 
 .queue-stat dt {
@@ -171,7 +171,7 @@
   height: 2.5rem;
   border: 2px solid var(--field-border);
   border-radius: var(--radius-full);
-  background: var(--glass-bg);
+  background: var(--surface-subtle);
   font-size: 1.125rem;
   transition:
     background-color var(--duration-base) var(--ease),
@@ -230,7 +230,7 @@
   width: 2rem;
   height: 2rem;
   border-radius: var(--radius-full);
-  background: var(--glass-bg-strong);
+  background: var(--surface-selected);
   color: var(--color-primary);
 }
 

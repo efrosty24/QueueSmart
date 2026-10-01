@@ -65,7 +65,7 @@
 }
 
 .history-filter:hover {
-  background: var(--glass-bg);
+  background: var(--surface-subtle);
   color: var(--color-text);
 }
 
@@ -105,7 +105,7 @@
 }
 
 .history-table tbody tr:hover {
-  background: var(--glass-bg);
+  background: var(--surface-subtle);
 }
 
 .history-table time {
@@ -141,7 +141,7 @@
   width: 2rem;
   height: 2rem;
   border-radius: var(--radius-sm);
-  background: var(--glass-bg-strong);
+  background: var(--surface-selected);
   color: var(--color-primary);
 }
 
