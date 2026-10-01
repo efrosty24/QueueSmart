@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta name="color-scheme" content="light dark" />
+    <title>QueueSmart</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a light/dark flash.
+      // Keep the storage key in sync with THEME_STORAGE_KEY in src/theme/theme.ts.
+      try {
+        var pref = localStorage.getItem('queuesmart-theme')
+        var dark = pref === 'dark' || (pref !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

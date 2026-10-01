@@ -10,11 +10,41 @@ QueueSmart/
 └── backend/    # FastAPI (coming soon)
 ```
 
+### Frontend layout
+
+```
+frontend/src/
+├── theme/           # design tokens, glass styles, light/dark/system logic
+├── components/      # shared UI (AppHeader, TextField, ThemeToggle)
+└── features/
+    ├── auth/        # login, registration, validation, mock session, route guards
+    └── dashboard/   # page users land on after signing in
+```
+
+Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.md) before writing UI.**
+
+## Features so far
+
+- **Login** (`/login`) and **Registration** (`/register`). Email is the username.
+- Client-side validation: required fields, email format, password rules (8+ characters with a letter and a number), and matching confirmation on sign-up.
+- **Mock sign-in:** a valid login or registration signs the user in and redirects to **`/dashboard`**. The session is kept in the browser, so it survives a reload. **Sign out** clears it.
+- **Route guards:** signed-out users who open `/dashboard` are sent to `/login`. Signed-in users who open `/login` or `/register` are sent to `/dashboard`.
+- Light, dark and system themes with a frosted-glass look.
+
+There is no backend yet. Any valid email and password is accepted, and every account is a patient. The fake calls are in `frontend/src/features/auth/authApi.ts`.
+
 ## Setup
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 20+ (for local development)
+- [Node.js](https://nodejs.org/) 26 (current release)
+- npm 12.2 or newer. Node 26 ships with npm 11, so upgrade it once:
+
+  ```bash
+  npm install -g npm@latest
+  ```
+
+  Check with `npm -v`.
 - [Docker](https://www.docker.com/) (for running the container)
 
 ### Clone
@@ -43,8 +73,70 @@ docker build -t queuesmart .
 docker run --rm -p 8080:80 queuesmart
 ```
 
-Then open http://localhost:8080. The image builds the frontend and serves it with nginx.
+Then open http://localhost:8080. The image builds the frontend on Node 26 with npm 12.2.0 and serves it with nginx (config in `frontend/nginx.conf`). To use a different npm version, pass `--build-arg NPM_VERSION=<version>` to `docker build`.
 
 ### Backend
 
 Not yet added.
+
+## Extending: adding the admin view
+
+The admin dashboard UI (services, live queues, reports) is **not built yet**. These steps add the admin *route and sign-in path* using only client-side logic, so the real admin pages can be dropped in later. The groundwork is already there: every session has a `role` of `'patient'` or `'admin'` (`features/auth/session.ts`).
+
+> Client-side roles are for UI only. Anyone can edit `localStorage` and make themselves an "admin". The FastAPI backend must check roles on every request once it exists.
+
+**1. Give some mock accounts the admin role.** In `features/auth/authApi.ts`, decide the role from a mock list instead of always returning `'patient'`:
+
+```ts
+// Mock staff accounts until the backend decides roles.
+const MOCK_ADMIN_EMAILS = ['admin@university.edu']
+
+function toSessionUser(email: string): SessionUser {
+  const normalized = email.trim().toLowerCase()
+  return { email: normalized, role: MOCK_ADMIN_EMAILS.includes(normalized) ? 'admin' : 'patient' }
+}
+```
+
+Use `toSessionUser(credentials.email)` as the return value of `login()`. Keep `register()` creating patients only, since staff accounts are set up by the clinic, not through public sign-up.
+
+**2. Add a role guard.** In `features/auth/RouteGuards.tsx`, next to `RequireAuth`:
+
+```tsx
+export function RequireRole({ role }: { role: Role }) {
+  const { user } = useAuth()
+  if (user?.role !== role) return <Navigate to="/dashboard" replace />
+  return <Outlet />
+}
+```
+
+**3. Send each role to its own home page.** Add a helper and use it wherever the code currently navigates to `'/dashboard'` (`LoginPage`, `RegisterPage`, `RedirectIfSignedIn`, and the catch-all route in `App.tsx`):
+
+```ts
+export const homePathFor = (user: SessionUser) => (user.role === 'admin' ? '/admin' : '/dashboard')
+```
+
+**4. Create a placeholder admin page.** Add `features/admin/AdminDashboardPage.tsx`, built like `DashboardPage`: `<AppHeader>` with a Sign out action, and a `.glass` card saying "Admin dashboard (coming soon)". Follow [THEMING.md](frontend/THEMING.md) for styles.
+
+**5. Register the route** in `App.tsx`, nested so it needs both a session and the admin role:
+
+```tsx
+<Route element={<RequireAuth />}>
+  <Route path="/dashboard" element={<DashboardPage />} />
+  <Route element={<RequireRole role="admin" />}>
+    <Route path="/admin" element={<AdminDashboardPage />} />
+  </Route>
+</Route>
+```
+
+**6. Validate admin forms on the client the same way as auth.** When the service form is built, put its rules in `features/admin/validation.ts`, following `features/auth/validation.ts`. Each rule is a small function that returns an error message or `undefined`. Based on the A1 design, a service needs:
+- **Name:** required, 100 characters or fewer
+- **Description:** optional, 500 characters or fewer
+- **Expected duration:** a whole number of minutes, 1 to 240
+- **Priority:** one of a fixed set, for example `low`, `medium`, `high`
+
+The form hook `features/auth/useAuthForm.ts` isn't specific to auth. Move it to `src/components/useForm.ts` (or similar) and reuse it for admin forms.
+
+**7. Test it by hand.**
+- Sign in as `admin@university.edu`. You should land on `/admin`.
+- Sign in as any other email. You should land on `/dashboard`, and opening `/admin` should send you back to `/dashboard`.
+- Sign out. Opening `/admin` should send you to `/login`.
