@@ -176,6 +176,107 @@
   gap: var(--space-4);
 }
 
+/* ---------- Queue management ---------- */
+
+.queue-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+
+.queue-panel__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.queue-panel__title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-lg);
+}
+
+.queue-panel__count {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.queue-panel__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+
+.queue-row__position {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-full);
+  background: var(--glass-bg-strong);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.queue-row__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.queue-row__name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.queue-row__wait {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.queue-row__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.queue-row__icon-btn {
+  min-width: 44px;
+  padding: var(--space-2);
+}
+
+@media (max-width: 480px) {
+  .queue-row {
+    flex-wrap: wrap;
+  }
+
+  .queue-row__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 @media (max-width: 480px) {
   .admin-page__main {
     padding: var(--space-6) 0;

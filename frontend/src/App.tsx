@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { AdminDashboardPage } from './features/admin/AdminDashboardPage'
+import { QueueManagementPage } from './features/admin/QueueManagementPage'
 import { ServiceManagementPage } from './features/admin/ServiceManagementPage'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { LoginPage } from './features/auth/LoginPage'
@@ -24,6 +25,8 @@ export default function App() {
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminDashboardPage />} />
               <Route path="/admin/services" element={<ServiceManagementPage />} />
+              <Route path="/admin/queue" element={<QueueManagementPage />} />
+              <Route path="/admin/queue/:serviceId" element={<QueueManagementPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

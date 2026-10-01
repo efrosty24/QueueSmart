@@ -98,14 +98,19 @@ export function AdminDashboardPage() {
                   <span className="service-card__queue-count">{service.queueLength}</span>
                   {service.queueLength === 1 ? 'person waiting' : 'people waiting'}
                 </p>
-                <button
-                  type="button"
-                  className={`btn ${isOpen ? 'btn-ghost' : 'btn-primary'} btn-block`}
-                  onClick={() => handleToggle(service)}
-                  disabled={isPending}
-                >
-                  {isPending ? 'Updating…' : isOpen ? 'Close queue' : 'Open queue'}
-                </button>
+                <div className="service-card__actions">
+                  <Link to={`/admin/queue/${service.id}`} className="btn btn-ghost">
+                    View queue
+                  </Link>
+                  <button
+                    type="button"
+                    className={`btn ${isOpen ? 'btn-ghost' : 'btn-primary'}`}
+                    onClick={() => handleToggle(service)}
+                    disabled={isPending}
+                  >
+                    {isPending ? 'Updating…' : isOpen ? 'Close queue' : 'Open queue'}
+                  </button>
+                </div>
               </article>
             )
           })}
