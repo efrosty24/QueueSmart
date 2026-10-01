@@ -41,6 +41,13 @@
   border-color: var(--color-danger);
 }
 
+/* Used by TextArea; selects reuse .field__input as-is. */
+.field__input--textarea {
+  min-height: 6.5rem;
+  padding-top: var(--space-3);
+  resize: vertical;
+}
+
 /* Leave room for the Show/Hide button. */
 .field__control:has(.field__reveal) .field__input {
   padding-right: 4.5rem;

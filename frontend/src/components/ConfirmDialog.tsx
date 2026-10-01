@@ -9,6 +9,7 @@ type ConfirmDialogProps = {
   cancelLabel?: string
   icon?: ReactNode
   tone?: 'danger' | 'primary'
+  pending?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -23,6 +24,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   icon,
   tone = 'primary',
+  pending = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -46,11 +48,11 @@ export function ConfirmDialog({
       onCancel={(event) => {
         // Escape key: let React state close it so `open` stays in sync.
         event.preventDefault()
-        onCancel()
+        if (!pending) onCancel()
       }}
       onClick={(event) => {
         // A click on the dialog element itself means the backdrop was clicked.
-        if (event.target === dialogRef.current) onCancel()
+        if (event.target === dialogRef.current && !pending) onCancel()
       }}
     >
       <div className="confirm-dialog__body">
@@ -58,15 +60,16 @@ export function ConfirmDialog({
         <h2 id={titleId}>{title}</h2>
         <p id={messageId}>{message}</p>
         <div className="confirm-dialog__actions">
-          <button type="button" className="btn btn-ghost btn-pill" onClick={onCancel} autoFocus>
+          <button type="button" className="btn btn-ghost btn-pill" onClick={onCancel} disabled={pending} autoFocus>
             {cancelLabel}
           </button>
           <button
             type="button"
             className={`btn btn-pill ${tone === 'danger' ? 'btn-danger' : 'btn-primary'}`}
             onClick={onConfirm}
+            disabled={pending}
           >
-            {confirmLabel}
+            {pending ? 'Working…' : confirmLabel}
           </button>
         </div>
       </div>

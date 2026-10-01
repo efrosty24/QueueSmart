@@ -1,17 +1,20 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { AppShell } from './components/AppShell'
+import { AdminDashboardPage } from './features/admin/AdminDashboardPage'
+import { QueueManagementPage } from './features/admin/QueueManagementPage'
+import { ServiceManagementPage } from './features/admin/ServiceManagementPage'
 import { AuthProvider, useAuth } from './features/auth/AuthProvider'
 import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
-import { RedirectIfSignedIn, RequireAuth } from './features/auth/RouteGuards'
+import { RedirectIfSignedIn, RequireAdmin, RequireAuth } from './features/auth/RouteGuards'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { HistoryPage } from './features/history/HistoryPage'
 import { JoinQueuePage } from './features/join/JoinQueuePage'
-import { QueueStatusPage } from './features/queue/QueueStatusPage'
-import { ThemeProvider } from './theme/ThemeProvider'
 import { NotificationsPage } from './features/notifications/NotificationsPage'
 import { NotificationsProvider } from './features/notifications/NotificationsProvider'
 import { QueueProvider } from './features/queue/QueueProvider'
+import { QueueStatusPage } from './features/queue/QueueStatusPage'
+import { ThemeProvider } from './theme/ThemeProvider'
 
 export default function App() {
   return (
@@ -32,6 +35,12 @@ export default function App() {
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
               </Route>
+            </Route>
+            <Route element={<RequireAdmin />}>
+              <Route path="/admin" element={<AdminDashboardPage />} />
+              <Route path="/admin/services" element={<ServiceManagementPage />} />
+              <Route path="/admin/queue" element={<QueueManagementPage />} />
+              <Route path="/admin/queue/:serviceId" element={<QueueManagementPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
