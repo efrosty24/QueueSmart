@@ -6,10 +6,20 @@ import { deriveQueueState } from './queueStatus'
 // TODO: replace with live data from the backend (polling or WebSocket).
 const DEMO_START_KEY = 'queuesmart-demo-queue-start'
 
-function readDemoStart() {
+// Reads the demo start without creating one (for pages that only look at the result).
+export function peekDemoStart(): number | null {
   try {
     const stored = Number(sessionStorage.getItem(DEMO_START_KEY))
-    if (stored > 0) return stored
+    return stored > 0 ? stored : null
+  } catch {
+    return null
+  }
+}
+
+function readDemoStart() {
+  const existing = peekDemoStart()
+  if (existing) return existing
+  try {
     const now = Date.now()
     sessionStorage.setItem(DEMO_START_KEY, String(now))
     return now
