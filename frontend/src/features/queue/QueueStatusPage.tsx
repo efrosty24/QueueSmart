@@ -18,7 +18,7 @@ import { formatMinutes, formatTime } from '../../lib/format'
 import { DEMO_STEP_MS, type QueueEventKind } from '../../mocks/activeQueue'
 import { QueueStatusBadge } from './QueueStatusBadge'
 import { statusLabels, type QueueState, type QueueStatus } from './queueStatus'
-import { useQueueStatus } from './useQueueStatus'
+import { useQueue } from './QueueProvider'
 import './queue.css'
 
 const steps: { status: QueueStatus; icon: IconType }[] = [
@@ -36,7 +36,7 @@ const updateIcons: Record<QueueEventKind, IconType> = {
 }
 
 export function QueueStatusPage() {
-  const { queue, restartDemo } = useQueueStatus()
+  const { queue, restartDemo } = useQueue()
 
   return (
     <>
