@@ -55,7 +55,7 @@ export function RegisterPage() {
           label="Password"
           type="password"
           autoComplete="new-password"
-          hint={`At least ${PASSWORD_MIN_LENGTH} characters, with a letter and a number.`}
+          hint={`At least ${PASSWORD_MIN_LENGTH} characters, with an uppercase letter and a special character (like ! or #).`}
           {...fieldProps('password')}
         />
         <TextField
