@@ -18,17 +18,17 @@ def test_register_creates_patient_account(client):
     response = register(client, email="  New.Student@University.edu ")
 
     assert response.status_code == 201
-    body = response.json()
-    assert body["email"] == "new.student@university.edu"
-    assert body["role"] == "patient"
-    assert "password" not in body and "password_hash" not in body
+    user = response.json()["user"]
+    assert user["email"] == "new.student@university.edu"
+    assert user["role"] == "patient"
+    assert "password" not in user and "password_hash" not in user
 
 
 def test_register_with_admin_in_name_creates_admin(client):
     response = register(client, email="clinic.admin@university.edu")
 
     assert response.status_code == 201
-    assert response.json()["role"] == "admin"
+    assert response.json()["user"]["role"] == "admin"
 
 
 def test_register_rejects_duplicate_email(client):
@@ -108,14 +108,14 @@ def test_login_with_seed_student(client):
     response = login(client)
 
     assert response.status_code == 200
-    assert response.json()["role"] == "patient"
+    assert response.json()["user"]["role"] == "patient"
 
 
 def test_login_with_seed_admin(client):
     response = login(client, email="admin@university.edu")
 
     assert response.status_code == 200
-    assert response.json()["role"] == "admin"
+    assert response.json()["user"]["role"] == "admin"
 
 
 def test_login_after_register_is_case_insensitive_on_email(client):
@@ -124,7 +124,7 @@ def test_login_after_register_is_case_insensitive_on_email(client):
     response = login(client, email="NEW.STUDENT@university.edu")
 
     assert response.status_code == 200
-    assert response.json()["email"] == "new.student@university.edu"
+    assert response.json()["user"]["email"] == "new.student@university.edu"
 
 
 @pytest.mark.parametrize(

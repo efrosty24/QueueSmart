@@ -5,6 +5,7 @@ them. The outer max_length caps oversized input before the regex rules run;
 the precise limits live in validation.py.
 """
 
+from datetime import datetime
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictStr
@@ -34,3 +35,11 @@ class UserOut(BaseModel):
     id: str
     email: str
     role: Role
+
+
+class AuthResponse(BaseModel):
+    """Returned by login and register. Send `token` as "Authorization: Bearer <token>"."""
+
+    token: str
+    expires_at: datetime
+    user: UserOut
