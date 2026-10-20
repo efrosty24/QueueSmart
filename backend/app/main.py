@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .auth.router import router as auth_router
+from .errors import register_error_handlers
+
 app = FastAPI(title="QueueSmart API", version="0.1.0")
 
 # The Vite dev server proxies /api, so CORS only matters when calling the API
@@ -11,6 +14,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+register_error_handlers(app)
+app.include_router(auth_router)
 
 
 @app.get("/api/health")

@@ -6,9 +6,16 @@ os.environ.setdefault("QUEUESMART_BCRYPT_ROUNDS", "4")
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.auth.store import users  # noqa: E402
 from app.main import app  # noqa: E402
 
 
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def fresh_store():
+    """Every test starts with only the demo accounts."""
+    users.reset()
