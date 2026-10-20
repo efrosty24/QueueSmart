@@ -2,20 +2,23 @@ import { useEffect, useState, type ChangeEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { AppHeader } from '../../components/AppHeader'
 import { SelectField } from '../../components/SelectField'
+import { errorMessage } from '../../lib/api'
 import { useAuth } from '../auth/AuthProvider'
 import {
-  fetchQueue,
+  fetchServiceQueue,
   fetchServices,
-  moveQueueEntry,
-  removeQueueEntry,
-  serveNextQueueEntry,
+  serveNext,
+  setEntryPriority,
   type QueueEntry,
   type Service,
 } from './adminApi'
 import './admin.css'
 
-// Lets admins view one service's queue at a time, reorder or remove people in
-// it, and call the next person in — all simulated, no real notifications sent.
+// How often to reload the line so new arrivals and departures appear.
+const POLL_MS = 5000
+
+// Lets admins view one service's queue at a time, mark people urgent, and call
+// the next person in. Urgent patients go first; otherwise first come, first served.
 export function QueueManagementPage() {
   const { user, token, signOut } = useAuth()
   const navigate = useNavigate()
@@ -25,6 +28,7 @@ export function QueueManagementPage() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [now, setNow] = useState(Date.now)
 
   // Load services for this session; land on the first if the URL didn't name one.
   useEffect(() => {
@@ -45,23 +49,32 @@ export function QueueManagementPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
-  // Load the selected service's queue whenever it changes.
+  // Load the selected service's queue whenever it changes, then keep it current.
   useEffect(() => {
     if (!serviceId) return
     let cancelled = false
     setQueue(null)
     setNotice(null)
-    fetchQueue(serviceId)
-      .then((data) => {
-        if (!cancelled) setQueue(data)
-      })
-      .catch(() => {
-        if (!cancelled) setError('Could not load the queue. Try refreshing the page.')
-      })
+    setError(null)
+    const load = (initial: boolean) => {
+      fetchServiceQueue(serviceId, token)
+        .then((data) => {
+          if (cancelled) return
+          setQueue(data)
+          setNow(Date.now())
+        })
+        .catch(() => {
+          // Later polls keep the last known line; only a failed first load is an error.
+          if (!cancelled && initial) setError('Could not load the queue. Try refreshing the page.')
+        })
+    }
+    load(true)
+    const timer = setInterval(() => load(false), POLL_MS)
     return () => {
       cancelled = true
+      clearInterval(timer)
     }
-  }, [serviceId])
+  }, [serviceId, token])
 
   const selectedService = services?.find((service) => service.id === serviceId) ?? null
 
@@ -74,38 +87,28 @@ export function QueueManagementPage() {
     setBusy(true)
     setError(null)
     try {
-      const { served, queue: nextQueue } = await serveNextQueueEntry(serviceId)
+      const { served, queue: nextQueue } = await serveNext(serviceId, token)
       setQueue(nextQueue)
-      setNotice(served ? `Now serving ${served.name}.` : 'The queue is already empty.')
-    } catch {
-      setError('Could not serve the next person. Try again.')
+      setNotice(served ? `Now serving ${served.email} (ticket ${served.ticket}).` : 'The queue is already empty.')
+    } catch (err) {
+      setError(errorMessage(err, 'Could not serve the next person. Try again.'))
     } finally {
       setBusy(false)
     }
   }
 
-  const handleMove = async (entryId: string, direction: 'up' | 'down') => {
+  const handleTogglePriority = async (entry: QueueEntry) => {
     if (!serviceId) return
+    const priority = entry.priority === 'urgent' ? 'normal' : 'urgent'
     setBusy(true)
     setError(null)
     try {
-      setQueue(await moveQueueEntry(serviceId, entryId, direction))
-    } catch {
-      setError('Could not reorder the queue. Try again.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleRemove = async (entry: QueueEntry) => {
-    if (!serviceId) return
-    setBusy(true)
-    setError(null)
-    try {
-      setQueue(await removeQueueEntry(serviceId, entry.id))
-      setNotice(`Removed ${entry.name} from the queue.`)
-    } catch {
-      setError(`Could not remove ${entry.name}. Try again.`)
+      setQueue(await setEntryPriority(serviceId, entry.id, priority, token))
+      setNotice(priority === 'urgent'
+        ? `${entry.email} is marked urgent and moves ahead of routine patients.`
+        : `${entry.email} is back in arrival order.`)
+    } catch (err) {
+      setError(errorMessage(err, `Could not change ${entry.email}'s priority. Try again.`))
     } finally {
       setBusy(false)
     }
@@ -142,7 +145,8 @@ export function QueueManagementPage() {
           <p className="admin-intro__eyebrow">Admin dashboard</p>
           <h1 id="queue-title">Queue management</h1>
           <p className="admin-intro__note">
-            View who's waiting for a service, reorder or remove them, or call the next person in.
+            View who's waiting for a service and call the next person in. Patients are served in arrival
+            order, except that anyone marked urgent goes first.
           </p>
           {services && services.length > 0 && (
             <SelectField
@@ -193,36 +197,29 @@ export function QueueManagementPage() {
                 <p className="queue-panel__empty">Nobody is waiting for this service right now.</p>
               ) : (
                 <ol className="queue-list">
-                  {queue.map((entry, index) => (
+                  {queue.map((entry) => (
                     <li key={entry.id} className="queue-row">
                       <span className="queue-row__position" aria-hidden="true">
-                        {index + 1}
+                        {entry.position}
                       </span>
                       <div className="queue-row__info">
-                        <span className="queue-row__name">{entry.name}</span>
-                        <span className="queue-row__wait">Waiting {entry.joinedMinutesAgo} min</span>
+                        <span className="queue-row__name">
+                          {entry.email}{' '}
+                          {entry.priority === 'urgent' && <span className="badge badge-danger">Urgent</span>}
+                        </span>
+                        <span className="queue-row__wait">
+                          Ticket {entry.ticket} · Waiting {minutesSince(entry.joinedAt, now)} min
+                        </span>
                       </div>
                       <div className="queue-row__actions">
                         <button
                           type="button"
-                          className="btn btn-ghost queue-row__icon-btn"
-                          onClick={() => handleMove(entry.id, 'up')}
-                          disabled={busy || index === 0}
-                          aria-label={`Move ${entry.name} up`}
+                          className="btn btn-ghost"
+                          onClick={() => handleTogglePriority(entry)}
+                          disabled={busy}
+                          aria-pressed={entry.priority === 'urgent'}
                         >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost queue-row__icon-btn"
-                          onClick={() => handleMove(entry.id, 'down')}
-                          disabled={busy || index === queue.length - 1}
-                          aria-label={`Move ${entry.name} down`}
-                        >
-                          ↓
-                        </button>
-                        <button type="button" className="btn btn-danger" onClick={() => handleRemove(entry)} disabled={busy}>
-                          Remove
+                          {entry.priority === 'urgent' ? 'Mark routine' : 'Mark urgent'}
                         </button>
                       </div>
                     </li>
@@ -235,4 +232,8 @@ export function QueueManagementPage() {
       </main>
     </div>
   )
+}
+
+function minutesSince(iso: string, now: number) {
+  return Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000))
 }

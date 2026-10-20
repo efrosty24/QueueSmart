@@ -332,11 +332,6 @@
   flex-shrink: 0;
 }
 
-.queue-row__icon-btn {
-  min-width: 44px;
-  padding: var(--space-2);
-}
-
 @media (max-width: 480px) {
   .queue-row {
     flex-wrap: wrap;

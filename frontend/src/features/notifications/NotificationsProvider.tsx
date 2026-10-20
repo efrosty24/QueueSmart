@@ -1,8 +1,8 @@
 // NotificationsProvider component for managing app notifications.
 
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import type { QueueEventKind } from '../../mocks/activeQueue'
 import { useAuth } from '../auth/AuthProvider'
+import type { QueueEventKind } from '../queue/queueApi'
 import { useQueue } from '../queue/QueueProvider'
 
 type AppNotification = {

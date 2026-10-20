@@ -16,26 +16,30 @@ export function JoinQueuePage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [busy, setBusy] = useState(false)
   const { queue, joinQueue, leaveQueue } = useQueue()
   const { services, loading, error: servicesError } = useServices()
   const selectedService = services.find((service) => service.id === selected)
   const active = queue && queue.status !== 'served'
 
-  function handleJoin(event: FormEvent) {
+  async function handleJoin(event: FormEvent) {
     event.preventDefault()
     setNotice('')
     if (!selectedService) { setError('Select a clinic service before joining.'); return }
-    const issue = joinQueue(selectedService)
+    setBusy(true)
+    const issue = await joinQueue(selectedService)
+    setBusy(false)
     setError(issue ?? '')
     if (!issue) setNotice(`You joined the ${selectedService.name} queue. Your position will update automatically.`)
   }
 
-  function handleLeave() {
-    const left = leaveQueue()
+  async function handleLeave() {
     setConfirmLeave(false)
+    setBusy(true)
+    const issue = await leaveQueue()
+    setBusy(false)
     setError('')
-    setNotice(left ? 'You left the queue. Your visit is saved to History, and you can join another service.'
-      : 'Your visit has already finished. You can join another service.')
+    setNotice(issue ?? 'You left the queue. Your visit is saved to History, and you can join another service.')
   }
 
   return (
@@ -67,7 +71,7 @@ export function JoinQueuePage() {
             </div>
             {selectedService && <ClinicServiceCard service={selectedService} />}
             {active && <p className="alert alert-warning">You're already in the {queue.service.name} queue. Leave your current queue before joining another.</p>}
-            <button className="btn btn-primary" type="submit" disabled={Boolean(active) || loading || Boolean(servicesError) || selectedService?.status !== 'open'}>
+            <button className="btn btn-primary" type="submit" disabled={busy || Boolean(active) || loading || Boolean(servicesError) || selectedService?.status !== 'open'}>
               Join queue <LuArrowRight aria-hidden="true" />
             </button>
           </form>
@@ -90,7 +94,7 @@ export function JoinQueuePage() {
                   </dl>
                   <p className="join-muted" aria-live="polite">{queue.updates[0].message}</p>
                   <Link to="/queue" className="btn btn-primary">View queue status</Link>
-                  <button type="button" className="btn btn-danger-hover" onClick={() => setConfirmLeave(true)}>
+                  <button type="button" className="btn btn-danger-hover" disabled={busy} onClick={() => setConfirmLeave(true)}>
                     <LuLogOut aria-hidden="true" /> Leave queue
                   </button>
                 </>

@@ -20,6 +20,8 @@ backend/
 │   ├── main.py          # FastAPI app, routers, CORS
 │   ├── errors.py        # 422 validation error format
 │   ├── services.py      # service routes, validation, in-memory records
+│   ├── queue_store.py   # in-memory queues: ordering, join/leave/serve, position updates
+│   ├── queues.py        # /api/queues routes for patients and admins
 │   ├── wait_time.py     # reusable people-ahead × duration calculation
 │   └── auth/            # Authentication module
 │       ├── router.py        # /api/auth endpoints
@@ -40,13 +42,13 @@ frontend/src/
 ├── theme/           # design tokens, panel styles, light/dark/system logic
 ├── components/      # shared UI (AppShell sidebar, ConfirmDialog, PageHeader, TextField, ...)
 ├── lib/             # API client (api.ts) and small helpers (date/time formatting)
-├── mocks/           # mock data: services, live queue timeline, visit history
+├── mocks/           # mock data: legacy service names, past visit history
 └── features/
     ├── auth/        # login, registration, validation, session, route guards (calls the backend)
     ├── services/    # shared service API calls and patient service loading
     ├── dashboard/   # overview: current queue + recent visits
     ├── join/        # service selection, wait estimates, join/leave controls
-    ├── queue/       # Queue status screen
+    ├── queue/       # queue API calls, polling hook, Queue status screen
     └── history/     # History screen
 ```
 
@@ -60,28 +62,28 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 - **Roles:** an account is an **admin** when the name part of its email (before the @) contains "admin"; everyone else is a patient. The role always comes from the server, and admin pages require it.
 - **Service management** (`/admin/services`): admins create, edit and delete services through the backend. The admin dashboard can open or close a service. The patient dashboard and join page load this same list, including new services. Services are kept in memory and reset when the backend restarts.
 - **Wait estimates (Module 4):** the backend calculates each service's estimated wait and returns `estimatedWaitMinutes`. Service cards on the dashboard and join page display this response value.
+- **Queue management (Module 3):** patients join and leave a service's queue through the backend. Admins view each queue (`/admin/queue`), serve the next person, and can mark a patient urgent. Queues are ordered by priority (urgent first), then arrival order.
 - **Route guards:** signed-out users who open a signed-in page are sent to `/login`. Signed-in users who open `/login` or `/register` go to `/admin` or `/dashboard` depending on their role.
 - **Sidebar layout** for signed-in pages, with Dashboard, Queue status and History. Below 900px it becomes a slide-in menu. **Sign out** is a pill that turns red on hover and asks for confirmation in a popup.
 - **Dashboard** (`/dashboard`): current queue, available campus clinic services and estimated waits, recent in-app notifications, and the three most recent visits.
 - **Join queue** (`/join-queue`): select an open service, preview its wait, and join. Students can have one active queue at a time. Leaving requires confirmation and records a Left queue visit in History.
-- **Queue status** (`/queue`): current position, estimated wait, people ahead, and status (Waiting → Almost ready → Served), with a feed of status updates.
+- **Queue status** (`/queue`): current position, estimated wait, people ahead, and status (Waiting → Almost ready → Served), with a feed of status updates from the backend. The page checks for changes every 3 seconds.
 - **History** (`/history`): past queues with date, service, wait and outcome (Served, Left queue, No-show), summary totals, and an outcome filter.
 - Light, dark and system themes: red brand color on solid neutral backgrounds.
 
 ### Mock data
 
-Authentication and service management run on the backend (see [Backend API](#backend-api)). Queue actions, notifications and history are still frontend demos:
+Authentication, service management and queues run on the backend (see [Backend API](#backend-api)). Notifications and history are still frontend demos:
 
 | File | What it fakes |
 |---|---|
-| `services.ts` | Legacy service details for the scripted queue demo and old mock visits; live service lists use the API |
-| `activeQueue.ts` | The patient's current queue entry and a scripted timeline of what happens to it |
+| `services.ts` | Legacy service names for old mock visits; live service lists use the API |
 | `history.ts` | 12 past visits across the fall semester |
 
-- **Queue state:** new students start without an active queue. Joining a service creates a mock ticket, and the queue advances every 15 seconds until Served. State survives navigation and reloads in the same tab and is separated by student email. Completed and left visits remain in that tab's History when another queue is joined.
-- **Live queue demo:** **Start queue demo** on an empty Queue status page runs the original Sick Visit timeline, including a staff-priority delay. **Restart demo** restarts the current timeline. Notifications use the same queue events as Queue status. This is accelerated sample data, not a real clinic queue.
-- **Wait estimate:** service previews use the backend's `estimatedWaitMinutes`. The active queue's scripted demo still calculates its own changing wait until Module 3 supplies actual backend queue positions.
-- **Queue counts:** the service API returns placeholder counts (`queueLength`) until Module 3 implements real queue management. Admin queue actions still use their own frontend demo. Patient service lists reload when the page opens or the tab regains focus.
+- **Queue state** comes from the backend. A queue only moves when an admin serves someone, someone leaves, or a patient is marked urgent. To try it, sign in as the student in one browser and as the admin in another (or a private window), then serve the student from `/admin/queue`.
+- **History:** visits you finish (served or left) are added to the mock history in that browser tab. The backend doesn't store history yet.
+- **Notifications** are built from the backend's queue updates for your current entry.
+- Patient service lists reload when the page opens or the tab regains focus.
 
 ## Setup
 
@@ -153,7 +155,7 @@ Then open http://localhost:8080 (not 5173). nginx serves the frontend and forwar
 
 ## Backend API
 
-No database yet (that's Assignment 4): accounts, sessions and services live in memory and reset when the server restarts. Run one backend process so requests share that memory.
+No database yet (Assignment 4): accounts, sessions, services and queues live in memory and reset when the server restarts. Run one backend process so requests share that memory.
 
 ### Demo accounts
 
@@ -188,11 +190,38 @@ All service requests require `Authorization: Bearer <token>`. Patients and admin
 | `PATCH` | `/api/services/{id}/status` | `{status: "open"}` or `{status: "closed"}` | `200` updated service |
 | `DELETE` | `/api/services/{id}` | — | `204`, no body |
 
-Service responses include `id`, `name`, `description`, `expectedDurationMinutes`, `priority`, `status`, the placeholder `queueLength`, and the calculated `estimatedWaitMinutes`. New services start closed with a generated ID and a count of zero. Updating details preserves the ID, availability and count, and recalculates the estimate using the new duration. The estimate is calculated when returning a service, so it stays in sync with the current count and duration. Clients cannot submit their own estimate.
+Service responses include `id`, `name`, `description`, `expectedDurationMinutes`, `priority`, `status`, `queueLength` (people waiting in its queue right now), and the calculated `estimatedWaitMinutes`. New services start closed with a generated ID and a count of zero. Updating details preserves the ID, availability and count, and recalculates the estimate using the new duration. The estimate is calculated when returning a service, so it stays in sync with the current count and duration. Clients cannot submit their own estimate.
 
 Names and descriptions are required text, trimmed before validation, with limits of 100 and 1,000 characters. Duration must be a whole number from 1 to 480 (strings, decimals and booleans are rejected). Priority must be `low`, `medium` or `high`. Unknown fields are rejected. Invalid input returns `422` with field errors, missing services return `404`, missing/invalid sessions return `401`, and patient changes return `403`.
 
-The service tests cover create/list/update/delete, availability, permissions, validation boundaries, and rejected requests leaving data unchanged. Queue joining, serving, notifications and history backend endpoints belong to later modules.
+The service tests cover create/list/update/delete, availability, permissions, validation boundaries, and rejected requests leaving data unchanged. Deleting a service also removes everyone waiting in its queue. Notifications and history backend endpoints belong to later modules.
+
+### Queue endpoints (Module 3)
+
+All queue requests require `Authorization: Bearer <token>`. Each service has one queue.
+
+| Method | Path | Who | Body | Returns |
+|---|---|---|---|---|
+| `GET` | `/api/queues/me` | anyone signed in | — | `200` your queue entry, or `null` |
+| `POST` | `/api/queues/{serviceId}/join` | anyone signed in | — | `201` your new entry |
+| `DELETE` | `/api/queues/me` | anyone signed in | — | `204`, you left the queue |
+| `GET` | `/api/queues/{serviceId}` | admin | — | `200` the waiting entries, front of the line first |
+| `POST` | `/api/queues/{serviceId}/serve-next` | admin | — | `200` `{served, queue}`; `served` is `null` if nobody was waiting |
+| `PATCH` | `/api/queues/{serviceId}/entries/{entryId}` | admin | `{priority: "urgent"}` or `{priority: "normal"}` | `200` the reordered queue |
+
+An entry includes `id`, `ticket`, `serviceId`, `serviceName`, `email`, `priority`, `status` (`waiting` or `served`), `position` (1 = next, `null` once served), `peopleAhead`, `estimatedWaitMinutes`, `expectedDurationMinutes`, `joinedAt`, and `updates` (newest first; each has `kind`, `message` and `at`).
+
+**Ordering:** urgent entries go ahead of normal ones. Within the same priority, whoever joined first is served first; a join counter breaks ties when two joins share a timestamp. Everyone joins as `normal`, and only admins can change priority. Service priority (`low`/`medium`/`high`) describes the service and doesn't reorder anyone, because each queue holds a single service.
+
+**Rules:**
+- You can be waiting in one queue at a time. Joining a second one returns `409`. A served entry stays visible on `/me` until you join again.
+- Closed services can't be joined (`409`), but admins can still serve the people already waiting.
+- Leaving when you aren't waiting returns `404`. Leaving moves everyone behind you up.
+- Whenever someone's position changes, the backend adds an update (`moved`, `almost-ready` at position 2 or better, `delayed` if they moved back, `served`). The Queue status feed and notifications show these.
+- Each estimate is `estimate_wait(position - 1, duration)`, using the service's current duration.
+- On every start, the backend seeds demo patients: 4 in Sick Visit and 2 in Flu Shot.
+
+Unknown services return `404` (`Service not found.`), and an entry ID that isn't waiting in that queue returns `404`. Invalid priorities or extra fields return `422`. Patients calling admin routes get `403`.
 
 ### Wait-time estimation (Module 4)
 
@@ -200,7 +229,7 @@ The service tests cover create/list/update/delete, availability, permissions, va
 
 Service previews pass `queueLength` as the number of people ahead. For example, Sick Visit starts with 4 people waiting at 12 minutes each, so its API estimate is 48 minutes. Empty queues return zero. Closed services still include a numeric estimate, while the UI displays "Unavailable".
 
-Module 3 can reuse the same helper for an individual user by passing `position - 1` and the service duration. A person at position 1 has no one ahead and waits zero estimated minutes. Queue counts are still mocked until Module 3 is implemented; no new queue endpoints or database are included here.
+The queue endpoints (Module 3) reuse the same helper for each entry by passing `position - 1` and the service duration. A person at position 1 has no one ahead and waits zero estimated minutes.
 
 Tests cover normal estimates, zero wait, invalid values, changed queue counts and durations, and preventing clients from overriding the calculated field.
 
@@ -220,6 +249,6 @@ Tests cover normal estimates, zero wait, invalid values, changed queue counts an
 |---|---|---|
 | `401` | Wrong email/password, or a missing, expired or revoked token | `{detail}` (one generic login message, so it doesn't reveal which emails exist) |
 | `403` | A patient calls an admin-only endpoint | `{detail}` |
-| `404` | A service ID does not exist | `{detail}` |
-| `409` | Registering an email that already has an account | `{detail}` |
+| `404` | A service ID does not exist, a queue entry isn't waiting, or you leave without being in a queue | `{detail}` |
+| `409` | Registering an email that already has an account, joining a closed service, or joining while already waiting | `{detail}` |
 | `422` | Missing fields, wrong types, values too long, or a rule failed | `{detail, errors: {field: message}}` |

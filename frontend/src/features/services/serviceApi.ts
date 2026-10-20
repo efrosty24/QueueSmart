@@ -13,7 +13,7 @@ export type ServiceInput = {
 export type Service = ServiceInput & {
   id: string
   status: QueueStatus
-  // Demo counts until queue management is connected in Module 3.
+  // People currently waiting in this service's queue.
   queueLength: number
   estimatedWaitMinutes: number
 }

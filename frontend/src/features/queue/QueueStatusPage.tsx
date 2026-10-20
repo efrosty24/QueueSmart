@@ -8,14 +8,13 @@ import {
   LuHourglass,
   LuListOrdered,
   LuMapPin,
-  LuRefreshCw,
   LuUsers,
 } from 'react-icons/lu'
 import { Link } from 'react-router'
 import { PageHeader } from '../../components/PageHeader'
 import { ServiceIcon } from '../../components/ServiceIcon'
 import { formatMinutes, formatTime } from '../../lib/format'
-import { DEMO_STEP_MS, type QueueEventKind } from '../../mocks/activeQueue'
+import type { QueueEventKind } from './queueApi'
 import { QueueStatusBadge } from './QueueStatusBadge'
 import { statusLabels, type QueueState, type QueueStatus } from './queueStatus'
 import { useQueue } from './QueueProvider'
@@ -36,7 +35,7 @@ const updateIcons: Record<QueueEventKind, IconType> = {
 }
 
 export function QueueStatusPage() {
-  const { queue, restartDemo } = useQueue()
+  const { queue } = useQueue()
 
   if (!queue) return (
     <>
@@ -46,11 +45,6 @@ export function QueueStatusPage() {
         <p>Select a campus clinic service to see its wait time and join the queue.</p>
         <Link to="/join-queue" className="btn btn-primary">Find a clinic service</Link>
       </section>
-      <p className="queue-demo-note">
-        <button type="button" className="btn btn-ghost btn-pill" onClick={restartDemo}>
-          <LuRefreshCw aria-hidden="true" /> Start queue demo
-        </button>
-      </p>
     </>
   )
 
@@ -185,14 +179,6 @@ export function QueueStatusPage() {
           </dl>
         </section>
       </div>
-
-      <p className="queue-demo-note">
-        Demo data: the queue moves forward every {DEMO_STEP_MS / 1000} seconds.
-        <button type="button" className="btn btn-ghost btn-pill" onClick={restartDemo}>
-          <LuRefreshCw aria-hidden="true" />
-          Restart demo
-        </button>
-      </p>
     </>
   )
 }

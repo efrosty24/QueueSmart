@@ -8,10 +8,11 @@ export const outcomeLabels: Record<VisitOutcome, string> = {
   'no-show': 'No-show',
 }
 
-// Past visits, newest first. Once the demo queue on the Queue status page
-// reaches "served", today's visit shows up here too.
-export function getHistory(now = Date.now(), email = loadSession()?.email ?? ''): PastVisit[] {
-  const visits = [...mockHistory, ...queueVisits(email, now)]
+// Past visits, newest first. Once clinic staff serve the patient (or they
+// leave a queue), today's visit shows up here too.
+// `now` is unused, but callers pass it so the list re-reads as the queue changes.
+export function getHistory(_now = Date.now(), email = loadSession()?.email ?? ''): PastVisit[] {
+  const visits = [...mockHistory, ...queueVisits(email)]
   return visits.sort((a, b) => Date.parse(b.joinedAt) - Date.parse(a.joinedAt))
 }
 

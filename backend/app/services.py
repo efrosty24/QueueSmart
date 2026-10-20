@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, StringConstraints, computed_field
 
 from .auth.dependencies import get_current_user, require_admin
+from .queue_store import queues
 from .wait_time import estimate_wait
 
 Priority = Literal["low", "medium", "high"]
@@ -25,8 +26,11 @@ class ServiceInput(BaseModel):
 class Service(ServiceInput):
     id: str
     status: QueueStatus = "closed"
-    # Placeholder counts until Module 3 owns the queues.
-    queue_length: int = Field(default=0, alias="queueLength")
+
+    @computed_field(alias="queueLength")
+    @property
+    def queue_length(self) -> int:
+        return queues.waiting_count(self.id)
 
     @computed_field(alias="estimatedWaitMinutes")
     @property
@@ -46,9 +50,9 @@ services: dict[str, Service] = {}
 def reset_services() -> None:
     seeds = [
         Service(id="sick-visit", name="Sick Visit", description="Meet with clinic staff about a new health concern.",
-                expectedDurationMinutes=12, priority="high", status="open", queueLength=4),
+                expectedDurationMinutes=12, priority="high", status="open"),
         Service(id="flu-shot", name="Flu Shot", description="Visit the campus clinic for your seasonal flu vaccination.",
-                expectedDurationMinutes=5, priority="low", status="open", queueLength=2),
+                expectedDurationMinutes=5, priority="low", status="open"),
         Service(id="prescription-refill", name="Prescription Refill", description="Talk with clinic staff about an existing prescription.",
                 expectedDurationMinutes=6, priority="medium", status="open"),
         Service(id="lab-work", name="Lab Work", description="Sample collection and testing requested by your clinic provider.",
@@ -100,4 +104,5 @@ def set_service_status(service_id: str, body: StatusInput) -> Service:
 def delete_service(service_id: str) -> Response:
     _get_service(service_id)
     del services[service_id]
+    queues.remove_service(service_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
