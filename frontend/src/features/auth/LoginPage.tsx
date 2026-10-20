@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { TextField } from '../../components/TextField'
 import { useForm } from '../../hooks/useForm'
+import { errorMessage } from '../../lib/api'
 import { AuthLayout } from './AuthLayout'
 import { useAuth } from './AuthProvider'
 import { login } from './authApi'
@@ -21,11 +22,11 @@ export function LoginPage() {
     onSubmit: async (values) => {
       setError(null)
       try {
-        const user = await login(values)
-        signIn(user)
-        navigate(redirectTo ?? (user.role === 'admin' ? '/admin' : '/dashboard'), { replace: true })
-      } catch {
-        setError('Could not sign in. Check your email and password.')
+        const session = await login(values)
+        signIn(session)
+        navigate(redirectTo ?? (session.user.role === 'admin' ? '/admin' : '/dashboard'), { replace: true })
+      } catch (err) {
+        setError(errorMessage(err, 'Could not sign in. Please try again.'))
       }
     },
   })
