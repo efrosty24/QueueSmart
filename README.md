@@ -1,6 +1,6 @@
 # QueueSmart
 
-Monorepo with a React frontend and a Python FastAPI backend, containerized with Docker.
+Monorepo with a React frontend and a Python FastAPI backend. It runs locally with Node and Python; Docker is optional.
 
 ## Structure
 
@@ -8,8 +8,8 @@ Monorepo with a React frontend and a Python FastAPI backend, containerized with 
 QueueSmart/
 ├── frontend/            # React + TypeScript (Vite)
 ├── backend/             # Python FastAPI
-├── Dockerfile           # frontend image (built with nginx)
-└── docker-compose.yml   # frontend + backend together
+├── Dockerfile           # optional: frontend image (built with nginx)
+└── docker-compose.yml   # optional: frontend + backend together
 ```
 
 ### Backend layout
@@ -91,7 +91,7 @@ Sign-in runs on the backend (see [Backend API](#backend-api)). Everything else s
 
   Check with `npm -v`.
 - [Python](https://www.python.org/) 3.13 (for the backend)
-- [Docker](https://www.docker.com/) (for running the containers)
+- [Docker](https://www.docker.com/) is **optional**. You only need it to try the containers (see [Optional: run with Docker](#optional-run-with-docker)).
 
 ### Clone
 
@@ -102,6 +102,8 @@ cd QueueSmart
 
 ### Run locally
 
+This is the normal way to run QueueSmart while developing: no Docker needed. Use two terminals.
+
 Start the backend first (terminal 1):
 
 ```bash
@@ -110,6 +112,8 @@ python3.13 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
+
+On Windows, use `.venv\Scripts\pip` and `.venv\Scripts\uvicorn` instead of `.venv/bin/...` (and `python` or `py -3.13` instead of `python3.13`).
 
 API docs are at http://localhost:8000/docs.
 
@@ -121,7 +125,7 @@ npm install
 npm run dev      # http://localhost:5173
 ```
 
-The Vite dev server forwards `/api` to the backend on port 8000. Other frontend scripts: `npm run build`, `npm run preview`, `npm run lint`.
+Open http://localhost:5173. The Vite dev server forwards `/api` to the backend on port 8000, so the two connect automatically. Other frontend scripts: `npm run build`, `npm run preview`, `npm run lint`.
 
 ### Backend tests and coverage
 
@@ -132,15 +136,15 @@ cd backend
 
 This runs the unit tests and prints a coverage report. The run fails if coverage drops below 80%. For an HTML report, add `--cov-report=html` and open `htmlcov/index.html`.
 
-### Run with Docker
+### Optional: run with Docker
 
-From the repo root:
+Skip this if you don't use Docker; nothing else depends on it. It's handy for a one-command demo, since it needs no local Node or Python. From the repo root:
 
 ```bash
 docker compose up --build
 ```
 
-Then open http://localhost:8080. nginx serves the frontend and forwards `/api` to the backend container (config in `frontend/nginx.conf`). The frontend image builds on Node 26 with npm 12.2.0. To use a different npm version, pass `--build-arg NPM_VERSION=<version>`.
+Then open http://localhost:8080 (not 5173). nginx serves the frontend and forwards `/api` to the backend container (config in `frontend/nginx.conf`). The frontend image builds on Node 26 with npm 12.2.0. To use a different npm version, pass `--build-arg NPM_VERSION=<version>`.
 
 ## Backend API
 
