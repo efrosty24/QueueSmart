@@ -1,6 +1,7 @@
-// Mock clinic services, matching the A1 design. Replace with GET /services once the backend exists.
+// Legacy service details for the scripted queue demo and old mock visits.
+// Live service lists come from features/services/serviceApi.ts.
 
-export type ServiceId = 'sick-visit' | 'flu-shot' | 'prescription-refill' | 'lab-work'
+export type ServiceId = string
 
 export type Service = {
   id: ServiceId

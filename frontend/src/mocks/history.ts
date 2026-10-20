@@ -8,6 +8,7 @@ export type PastVisit = {
   id: string
   ticket: string
   serviceId: ServiceId
+  serviceName?: string
   // When the patient joined the queue (ISO 8601).
   joinedAt: string
   outcome: VisitOutcome

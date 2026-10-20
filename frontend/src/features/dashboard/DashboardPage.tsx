@@ -4,14 +4,14 @@ import { ClinicServiceCard } from '../../components/ClinicServiceCard'
 import { PageHeader } from '../../components/PageHeader'
 import { ServiceIcon } from '../../components/ServiceIcon'
 import { formatDate, formatMinutes } from '../../lib/format'
-import { serviceQueues } from '../../mocks/serviceQueues'
-import { services } from '../../mocks/services'
+import { services as demoServices } from '../../mocks/services'
 import { useAuth } from '../auth/AuthProvider'
 import { getHistory } from '../history/history'
 import { OutcomeBadge } from '../history/OutcomeBadge'
 import { NotificationsPanel } from '../notifications/NotificationsPanel'
 import { useQueue } from '../queue/QueueProvider'
 import { QueueStatusBadge } from '../queue/QueueStatusBadge'
+import { useServices } from '../services/useServices'
 import './dashboard.css'
 
 const RECENT_VISIT_COUNT = 3
@@ -20,6 +20,7 @@ const RECENT_VISIT_COUNT = 3
 export function DashboardPage() {
   const { user } = useAuth()
   const { queue, now } = useQueue()
+  const { services, loading, error } = useServices()
   // Read on every render so today's visit appears as soon as the queue finishes.
   const recentVisits = getHistory(now, user?.email).slice(0, RECENT_VISIT_COUNT)
 
@@ -97,12 +98,15 @@ export function DashboardPage() {
         <section className="dashboard-services" aria-labelledby="dashboard-services-title">
           <div className="dashboard-section-heading">
             <div><h2 id="dashboard-services-title">Clinic services</h2><p className="dashboard-muted">Browse available services and estimated waits.</p></div>
-            <span className="badge badge-success">{Object.values(serviceQueues).filter((service) => service.open).length} open</span>
+            <span className="badge badge-success">{services.filter((service) => service.status === 'open').length} open</span>
           </div>
+          {loading && <p role="status">Loading services…</p>}
+          {error && <p className="alert alert-error" role="alert">{error}</p>}
+          {!loading && !error && services.length === 0 && <p>No clinic services are available yet.</p>}
           <div className="dashboard-service-grid">
-            {Object.values(services).map((service) => (
-              <ClinicServiceCard key={service.id} serviceId={service.id}>
-                {serviceQueues[service.id].open
+            {services.map((service) => (
+              <ClinicServiceCard key={service.id} service={service}>
+                {service.status === 'open'
                   ? <Link className="btn btn-ghost btn-block" to={`/join-queue?service=${service.id}`}>Select service <LuArrowRight aria-hidden="true" /></Link>
                   : <p className="dashboard-muted">This queue is currently closed.</p>}
               </ClinicServiceCard>
@@ -124,7 +128,7 @@ export function DashboardPage() {
 
                 <span className="dashboard-visit__text">
                   <span className="dashboard-visit__name">
-                    {services[visit.serviceId].name}
+                    {visit.serviceName ?? demoServices[visit.serviceId]?.name ?? 'Clinic service'}
                   </span>
                   <span className="dashboard-muted">
                     {formatDate(new Date(visit.joinedAt))}

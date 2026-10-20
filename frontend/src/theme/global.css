@@ -28,6 +28,17 @@ body {
     color var(--duration-base) var(--ease);
 }
 
+/* Native dropdown menus need an opaque surface, including in dark mode. */
+select option,
+select optgroup {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+select option:disabled {
+  color: var(--color-text-muted);
+}
+
 a {
   color: var(--color-primary);
   font-weight: 600;

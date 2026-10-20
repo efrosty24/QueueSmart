@@ -11,6 +11,8 @@ export type QueueEntry = {
   id: string
   ticket: string
   serviceId: ServiceId
+  // Keep the selected service's details while this frontend queue demo runs.
+  service?: Service
   joinedAt: number
   initialPosition: number
   demo?: boolean
@@ -21,7 +23,7 @@ function timelineFor(entry?: QueueEntry): QueueTimelineStep[] {
   const timeline: QueueTimelineStep[] = [{
     position: entry.initialPosition,
     kind: 'joined',
-    message: `You joined the ${services[entry.serviceId].name} queue at position ${entry.initialPosition}.`,
+      message: `You joined the ${(entry.service ?? services[entry.serviceId]).name} queue at position ${entry.initialPosition}.`,
   }]
   for (let position = entry.initialPosition - 1; position >= 1; position--) {
     timeline.push({
@@ -77,7 +79,7 @@ export function deriveQueueState(startedAt: number, now: number, entry?: QueueEn
   const lastStep = timeline.length - 1
   const stepIndex = Math.min(Math.max(0, Math.floor((now - startedAt) / DEMO_STEP_MS)), lastStep)
   const { position } = timeline[stepIndex]
-  const service = services[entry?.serviceId ?? mockActiveQueue.serviceId]
+  const service = entry?.service ?? services[entry?.serviceId ?? mockActiveQueue.serviceId]
   const peopleAhead = position === null ? 0 : position - 1
 
   return {

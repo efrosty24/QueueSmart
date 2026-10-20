@@ -3,10 +3,13 @@ import { SelectField } from '../../components/SelectField'
 import { TextArea } from '../../components/TextArea'
 import { TextField } from '../../components/TextField'
 import { useForm } from '../../hooks/useForm'
+import { errorMessage } from '../../lib/api'
 import type { PriorityLevel, Service, ServiceInput } from './adminApi'
 import {
   PRIORITY_OPTIONS,
   SERVICE_NAME_MAX_LENGTH,
+  SERVICE_DESCRIPTION_MAX_LENGTH,
+  MAX_DURATION_MINUTES,
   validateServiceForm,
   type ServiceField,
 } from './serviceValidation'
@@ -43,8 +46,8 @@ export function ServiceFormDialog({ service, onClose, onSubmit }: ServiceFormDia
           expectedDurationMinutes: Number(values.durationMinutes),
           priority: values.priority as PriorityLevel,
         })
-      } catch {
-        setError(isEditing ? 'Could not save changes. Try again.' : 'Could not create the service. Try again.')
+      } catch (err) {
+        setError(errorMessage(err, isEditing ? 'Could not save changes. Try again.' : 'Could not create the service. Try again.'))
       }
     },
   })
@@ -100,6 +103,7 @@ export function ServiceFormDialog({ service, onClose, onSubmit }: ServiceFormDia
           />
           <TextArea
             label="Description"
+            maxLength={SERVICE_DESCRIPTION_MAX_LENGTH}
             placeholder="What happens during this service?"
             rows={3}
             {...fieldProps('description')}
@@ -109,6 +113,7 @@ export function ServiceFormDialog({ service, onClose, onSubmit }: ServiceFormDia
             type="number"
             inputMode="numeric"
             min={1}
+            max={MAX_DURATION_MINUTES}
             placeholder="e.g. 20"
             {...fieldProps('durationMinutes')}
           />

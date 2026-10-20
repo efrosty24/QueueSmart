@@ -1,6 +1,6 @@
 import type { PastVisit } from '../../mocks/history'
-import { serviceQueues } from '../../mocks/serviceQueues'
-import { services, type ServiceId } from '../../mocks/services'
+import { services } from '../../mocks/services'
+import type { Service } from '../services/serviceApi'
 import { deriveQueueState, type QueueEntry } from './queueStatus'
 
 type QueueSession = { entry: QueueEntry | null; visits: PastVisit[] }
@@ -15,7 +15,13 @@ function isEntry(value: unknown): value is QueueEntry {
   if (!value || typeof value !== 'object') return false
   const entry = value as Partial<QueueEntry>
   return typeof entry.id === 'string' && typeof entry.ticket === 'string'
-    && typeof entry.serviceId === 'string' && Object.hasOwn(services, entry.serviceId)
+    && typeof entry.serviceId === 'string'
+    && (entry.service === undefined ? Object.hasOwn(services, entry.serviceId)
+      : entry.service !== null && typeof entry.service === 'object'
+        && entry.service.id === entry.serviceId && typeof entry.service.name === 'string'
+        && typeof entry.service.expectedMinutes === 'number' && Number.isFinite(entry.service.expectedMinutes)
+        && entry.service.expectedMinutes >= 1 && entry.service.expectedMinutes <= 480
+        && ['low', 'medium', 'high'].includes(entry.service.priority))
     && typeof entry.joinedAt === 'number' && Number.isFinite(entry.joinedAt) && entry.joinedAt > 0
     && typeof entry.initialPosition === 'number' && Number.isInteger(entry.initialPosition)
     && entry.initialPosition > 0 && entry.initialPosition <= 100
@@ -26,7 +32,8 @@ function isVisit(value: unknown): value is PastVisit {
   if (!value || typeof value !== 'object') return false
   const visit = value as Partial<PastVisit>
   return typeof visit.id === 'string' && typeof visit.ticket === 'string'
-    && typeof visit.serviceId === 'string' && Object.hasOwn(services, visit.serviceId)
+    && typeof visit.serviceId === 'string' && visit.serviceId.length > 0
+    && (visit.serviceName === undefined || typeof visit.serviceName === 'string')
     && typeof visit.joinedAt === 'string' && Number.isFinite(Date.parse(visit.joinedAt))
     && (visit.outcome === 'served' || visit.outcome === 'left' || visit.outcome === 'no-show')
     && (visit.waitedMinutes === null || (typeof visit.waitedMinutes === 'number'
@@ -59,6 +66,7 @@ function save(email: string, session: QueueSession) {
 function pastVisit(entry: QueueEntry, outcome: 'served' | 'left', at: number): PastVisit {
   return {
     id: entry.id, ticket: entry.ticket, serviceId: entry.serviceId,
+    serviceName: entry.service?.name ?? services[entry.serviceId]?.name,
     joinedAt: new Date(entry.joinedAt).toISOString(), outcome,
     waitedMinutes: Math.max(0, Math.round((at - entry.joinedAt) / 60_000)),
   }
@@ -72,8 +80,9 @@ export function queueVisits(email: string, now = Date.now()): PastVisit[] {
   return [...visits, pastVisit(entry, 'served', queue.updates[0].at)]
 }
 
-export function joinService(email: string, serviceId: ServiceId, now = Date.now()): string | undefined {
-  if (!Object.hasOwn(serviceQueues, serviceId) || !serviceQueues[serviceId].open) return 'This clinic queue is closed.'
+export function joinService(email: string, service: Service, now = Date.now()): string | undefined {
+  if (service.status !== 'open') return 'This clinic queue is closed.'
+  const serviceId = service.id
   const session = readQueueSession(email)
   if (session.entry && deriveQueueState(session.entry.joinedAt, now, session.entry).status !== 'served') {
     return 'You already have an active queue. Leave it before joining another service.'
@@ -82,7 +91,8 @@ export function joinService(email: string, serviceId: ServiceId, now = Date.now(
   save(email, {
     visits: queueVisits(email, now),
     entry: {
-      id, serviceId, joinedAt: now, initialPosition: serviceQueues[serviceId].waiting + 1,
+      id, serviceId, joinedAt: now, initialPosition: service.queueLength + 1,
+      service: { id: serviceId, name: service.name, expectedMinutes: service.expectedDurationMinutes, priority: service.priority },
       ticket: `${serviceId[0].toUpperCase()}-${id.slice(0, 4).toUpperCase()}`,
     },
   })
