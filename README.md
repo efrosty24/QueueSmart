@@ -6,8 +6,29 @@ Monorepo with a React frontend and a Python FastAPI backend, containerized with 
 
 ```
 QueueSmart/
-├── frontend/   # React + TypeScript (Vite)
-└── backend/    # FastAPI (coming soon)
+├── frontend/            # React + TypeScript (Vite)
+├── backend/             # Python FastAPI
+├── Dockerfile           # frontend image (built with nginx)
+└── docker-compose.yml   # frontend + backend together
+```
+
+### Backend layout
+
+```
+backend/
+├── app/
+│   ├── main.py          # FastAPI app, routers, CORS
+│   ├── errors.py        # 422 validation error format
+│   └── auth/            # Authentication module
+│       ├── router.py        # /api/auth endpoints
+│       ├── schemas.py       # request/response models
+│       ├── validation.py    # regex rules: email (username) + password
+│       ├── passwords.py     # bcrypt hashing
+│       ├── roles.py         # patient vs admin
+│       ├── sessions.py      # 7-day session tokens
+│       ├── store.py         # in-memory accounts (no database yet)
+│       └── dependencies.py  # get_current_user, require_admin
+└── tests/               # pytest unit tests
 ```
 
 ### Frontend layout
@@ -16,10 +37,10 @@ QueueSmart/
 frontend/src/
 ├── theme/           # design tokens, panel styles, light/dark/system logic
 ├── components/      # shared UI (AppShell sidebar, ConfirmDialog, PageHeader, TextField, ...)
-├── lib/             # small helpers (date/time formatting)
+├── lib/             # API client (api.ts) and small helpers (date/time formatting)
 ├── mocks/           # mock data: services, live queue timeline, visit history
 └── features/
-    ├── auth/        # login, registration, validation, mock session, route guards
+    ├── auth/        # login, registration, validation, session, route guards (calls the backend)
     ├── dashboard/   # overview: current queue + recent visits
     ├── join/        # service selection, wait estimates, join/leave controls
     ├── queue/       # Queue status screen
@@ -30,10 +51,11 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 
 ## Features so far
 
-- **Login** (`/login`) and **Registration** (`/register`). Email is the username.
-- Client-side validation: required fields, email format, password rules (8+ characters with a letter and a number), and matching confirmation on sign-up.
-- **Mock sign-in:** a valid login or registration signs the user in and redirects to **`/dashboard`**. The session is kept in the browser, so it survives a reload. **Sign out** clears it.
-- **Route guards:** signed-out users who open a signed-in page are sent to `/login`. Signed-in users who open `/login` or `/register` are sent to `/dashboard`.
+- **Login** (`/login`) and **Registration** (`/register`), backed by the FastAPI auth module. Email is the username.
+- Validation on both sides: email format (an allowlist that also blocks SQL-injection input), password rules (8–64 characters with an uppercase letter and a special character), and matching confirmation on sign-up. The server re-checks everything.
+- **Sessions:** signing in returns a token that lasts **7 days**. It's kept in the browser and re-checked with the server on every page load. **Sign out** revokes it on the server.
+- **Roles:** an account is an **admin** when the name part of its email (before the @) contains "admin"; everyone else is a patient. The role always comes from the server, and admin pages require it.
+- **Route guards:** signed-out users who open a signed-in page are sent to `/login`. Signed-in users who open `/login` or `/register` go to `/admin` or `/dashboard` depending on their role.
 - **Sidebar layout** for signed-in pages, with Dashboard, Queue status and History. Below 900px it becomes a slide-in menu. **Sign out** is a pill that turns red on hover and asks for confirmation in a popup.
 - **Dashboard** (`/dashboard`): current queue, available campus clinic services and estimated waits, recent in-app notifications, and the three most recent visits.
 - **Join queue** (`/join-queue`): select an open service, preview its wait, and join. Students can have one active queue at a time. Leaving requires confirmation and records a Left queue visit in History.
@@ -43,7 +65,7 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 
 ### Mock data
 
-There is no backend yet, so everything runs on mock data in `frontend/src/mocks/`:
+Sign-in runs on the backend (see [Backend API](#backend-api)). Everything else still runs on mock data in `frontend/src/mocks/`:
 
 | File | What it fakes |
 |---|---|
@@ -52,7 +74,6 @@ There is no backend yet, so everything runs on mock data in `frontend/src/mocks/
 | `activeQueue.ts` | The patient's current queue entry and a scripted timeline of what happens to it |
 | `history.ts` | 12 past visits across the fall semester |
 
-- **Auth:** any valid email and password is accepted, and every account is a patient (`features/auth/authApi.ts`).
 - **Queue state:** new students start without an active queue. Joining a service creates a mock ticket, and the queue advances every 15 seconds until Served. State survives navigation and reloads in the same tab and is separated by student email. Completed and left visits remain in that tab's History when another queue is joined.
 - **Live queue demo:** **Start queue demo** on an empty Queue status page runs the original Sick Visit timeline, including a staff-priority delay. **Restart demo** restarts the current timeline. Notifications use the same queue events as Queue status. This is accelerated sample data, not a real clinic queue.
 - **Wait estimate:** people ahead × the service's expected minutes per patient.
@@ -69,7 +90,8 @@ There is no backend yet, so everything runs on mock data in `frontend/src/mocks/
   ```
 
   Check with `npm -v`.
-- [Docker](https://www.docker.com/) (for running the container)
+- [Python](https://www.python.org/) 3.13 (for the backend)
+- [Docker](https://www.docker.com/) (for running the containers)
 
 ### Clone
 
@@ -80,87 +102,86 @@ cd QueueSmart
 
 ### Run locally
 
+Start the backend first (terminal 1):
+
+```bash
+cd backend
+python3.13 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/uvicorn app.main:app --reload --port 8000
+```
+
+API docs are at http://localhost:8000/docs.
+
+Then the frontend (terminal 2):
+
 ```bash
 cd frontend
 npm install
 npm run dev      # http://localhost:5173
 ```
 
-Other scripts: `npm run build`, `npm run preview`, `npm run lint`.
+The Vite dev server forwards `/api` to the backend on port 8000. Other frontend scripts: `npm run build`, `npm run preview`, `npm run lint`.
+
+### Backend tests and coverage
+
+```bash
+cd backend
+.venv/bin/pytest
+```
+
+This runs the unit tests and prints a coverage report. The run fails if coverage drops below 80%. For an HTML report, add `--cov-report=html` and open `htmlcov/index.html`.
 
 ### Run with Docker
 
 From the repo root:
 
 ```bash
-docker build -t queuesmart .
-docker run --rm -p 8080:80 queuesmart
+docker compose up --build
 ```
 
-Then open http://localhost:8080. The image builds the frontend on Node 26 with npm 12.2.0 and serves it with nginx (config in `frontend/nginx.conf`). To use a different npm version, pass `--build-arg NPM_VERSION=<version>` to `docker build`.
+Then open http://localhost:8080. nginx serves the frontend and forwards `/api` to the backend container (config in `frontend/nginx.conf`). The frontend image builds on Node 26 with npm 12.2.0. To use a different npm version, pass `--build-arg NPM_VERSION=<version>`.
 
-### Backend
+## Backend API
 
-Not yet added.
+No database yet (that's Assignment 4): accounts and sessions live in memory and reset when the server restarts.
 
-## Extending: adding the admin view
+### Demo accounts
 
-The admin dashboard UI (services, live queues, reports) is **not built yet**. These steps add the admin *route and sign-in path* using only client-side logic, so the real admin pages can be dropped in later. The groundwork is already there: every session has a `role` of `'patient'` or `'admin'` (`features/auth/session.ts`).
+Created on every start (test values only):
 
-> Client-side roles are for UI only. Anyone can edit `localStorage` and make themselves an "admin". The FastAPI backend must check roles on every request once it exists.
+| Email | Password | Role |
+|---|---|---|
+| `admin@university.edu` | `Queue$mart1` | admin |
+| `student@university.edu` | `Queue$mart1` | patient |
 
-**1. Give some mock accounts the admin role.** In `features/auth/authApi.ts`, decide the role from a mock list instead of always returning `'patient'`:
+### Auth endpoints
 
-```ts
-// Mock staff accounts until the backend decides roles.
-const MOCK_ADMIN_EMAILS = ['admin@university.edu']
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| `POST` | `/api/auth/register` | `{email, password}` | `201` `{token, expires_at, user}`, signed in right away |
+| `POST` | `/api/auth/login` | `{email, password}` | `200` `{token, expires_at, user}` |
+| `GET` | `/api/auth/me` | — | `200` `{id, email, role}` for the current token |
+| `POST` | `/api/auth/logout` | — | `204`, token revoked |
+| `GET` | `/api/health` | — | `200` `{status: "ok"}` |
 
-function toSessionUser(email: string): SessionUser {
-  const normalized = email.trim().toLowerCase()
-  return { email: normalized, role: MOCK_ADMIN_EMAILS.includes(normalized) ? 'admin' : 'patient' }
-}
-```
+Send the token as `Authorization: Bearer <token>`. `user` is `{id, email, role}`, with `role` either `patient` or `admin`.
 
-Use `toSessionUser(credentials.email)` as the return value of `login()`. Keep `register()` creating patients only, since staff accounts are set up by the clinic, not through public sign-up.
+### Rules
 
-**2. Add a role guard.** In `features/auth/RouteGuards.tsx`, next to `RequireAuth`:
+- **Email (username):** trimmed and lowercased, at most 254 characters (64 before the @). Checked against an **allowlist** regex of characters found in real addresses, so quotes, `;`, `=`, spaces, `/` and `*` can never get through. `--` (SQL comment) and `..` are rejected too. This protects the username field from SQL injection once a database is added.
+- **Password at sign-up:** 8–64 characters (and at most 72 bytes, bcrypt's limit), with at least one uppercase letter and one special character (anything that isn't a letter, digit or space).
+- **Password at login:** required, same length cap.
+- **Types and extra fields:** values must be strings (no numbers or lists). Unknown fields are rejected, so a client can't send `"role": "admin"`.
+- **Passwords** are hashed with **bcrypt** (cost 12) and never stored or returned in plain text.
+- **Roles:** admin if the email's name part contains "admin" (`clinic.admin@university.edu` yes, `jane@admin.edu` no). Admin-only endpoints use the `require_admin` dependency: `401` without a session, `403` for patients.
+- **Sessions** last 7 days. The server keeps only a SHA-256 hash of each token.
 
-```tsx
-export function RequireRole({ role }: { role: Role }) {
-  const { user } = useAuth()
-  if (user?.role !== role) return <Navigate to="/dashboard" replace />
-  return <Outlet />
-}
-```
+### Errors
 
-**3. Send each role to its own home page.** Add a helper and use it wherever the code currently navigates to `'/dashboard'` (`LoginPage`, `RegisterPage`, `RedirectIfSignedIn`, and the catch-all route in `App.tsx`):
-
-```ts
-export const homePathFor = (user: SessionUser) => (user.role === 'admin' ? '/admin' : '/dashboard')
-```
-
-**4. Create a placeholder admin page.** Add `features/admin/AdminDashboardPage.tsx`, built like `DashboardPage`: a `<PageHeader>` and a `.glass` card saying "Admin dashboard (coming soon)". Nest its route inside the `<AppShell />` route so it gets the sidebar, and add an Admin link to `navItems` in `AppShell.tsx` (shown only when `user.role === 'admin'`). Follow [THEMING.md](frontend/THEMING.md) for styles.
-
-**5. Register the route** in `App.tsx`, nested so it needs both a session and the admin role:
-
-```tsx
-<Route element={<RequireAuth />}>
-  <Route path="/dashboard" element={<DashboardPage />} />
-  <Route element={<RequireRole role="admin" />}>
-    <Route path="/admin" element={<AdminDashboardPage />} />
-  </Route>
-</Route>
-```
-
-**6. Validate admin forms on the client the same way as auth.** When the service form is built, put its rules in `features/admin/validation.ts`, following `features/auth/validation.ts`. Each rule is a small function that returns an error message or `undefined`. Based on the A1 design, a service needs:
-- **Name:** required, 100 characters or fewer
-- **Description:** optional, 500 characters or fewer
-- **Expected duration:** a whole number of minutes, 1 to 240
-- **Priority:** one of a fixed set, for example `low`, `medium`, `high`
-
-The form hook `features/auth/useAuthForm.ts` isn't specific to auth. Move it to `src/components/useForm.ts` (or similar) and reuse it for admin forms.
-
-**7. Test it by hand.**
-- Sign in as `admin@university.edu`. You should land on `/admin`.
-- Sign in as any other email. You should land on `/dashboard`, and opening `/admin` should send you back to `/dashboard`.
-- Sign out. Opening `/admin` should send you to `/login`.
+| Status | When | Body |
+|---|---|---|
+| `401` | Wrong email/password, or a missing, expired or revoked token | `{detail}` (one generic login message, so it doesn't reveal which emails exist) |
+| `403` | A patient calls an admin-only endpoint | `{detail}` |
+| `409` | Registering an email that already has an account | `{detail}` |
+| `422` | Missing fields, wrong types, values too long, or a rule failed | `{detail, errors: {field: message}}` |
