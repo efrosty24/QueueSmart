@@ -1,0 +1,23 @@
+import os
+
+# Must be set before the app is imported: cheap bcrypt rounds keep tests fast.
+os.environ.setdefault("QUEUESMART_BCRYPT_ROUNDS", "4")
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.auth.sessions import sessions  # noqa: E402
+from app.auth.store import users  # noqa: E402
+from app.main import app  # noqa: E402
+
+
+@pytest.fixture
+def client() -> TestClient:
+    return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def fresh_store():
+    """Every test starts with only the demo accounts and no sessions."""
+    users.reset()
+    sessions.reset()

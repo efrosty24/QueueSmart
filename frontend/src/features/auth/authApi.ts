@@ -1,29 +1,36 @@
-import type { SessionUser } from './session'
+import { apiRequest } from '../../lib/api'
+import type { SessionUser, StoredSession } from './session'
 
-// Placeholder auth calls. There is no backend yet; requests are simulated.
-// Login recognizes admin@university.edu as a mock administrator.
-// All other logins and all registrations create patient sessions.
-// TODO: replace with real calls to the FastAPI auth endpoints.
+// Calls to the FastAPI auth module (backend/app/auth/router.py).
+// The server decides the role: emails whose name part contains "admin" are administrators.
 
 export type Credentials = {
   email: string
   password: string
 }
 
-const simulateRequest = () => new Promise((resolve) => setTimeout(resolve, 600))
-
-export async function login(credentials: Credentials): Promise<SessionUser> {
-  await simulateRequest()
-
-  const email = credentials.email.trim().toLowerCase()
-
-  return {
-    email,
-    role: email === 'admin@university.edu' ? 'admin' : 'patient',
-  }
+type AuthResponse = {
+  token: string
+  expires_at: string
+  user: SessionUser
 }
 
-export async function register(credentials: Credentials): Promise<SessionUser> {
-  await simulateRequest()
-  return { email: credentials.email.trim().toLowerCase(), role: 'patient' }
+function toSession({ token, expires_at, user }: AuthResponse): StoredSession {
+  return { token, expiresAt: expires_at, user }
+}
+
+export async function login(credentials: Credentials): Promise<StoredSession> {
+  return toSession(await apiRequest<AuthResponse>('/auth/login', { method: 'POST', body: credentials }))
+}
+
+export async function register(credentials: Credentials): Promise<StoredSession> {
+  return toSession(await apiRequest<AuthResponse>('/auth/register', { method: 'POST', body: credentials }))
+}
+
+export function fetchCurrentUser(token: string): Promise<SessionUser> {
+  return apiRequest<SessionUser>('/auth/me', { token })
+}
+
+export function logout(token: string): Promise<void> {
+  return apiRequest<void>('/auth/logout', { method: 'POST', token })
 }

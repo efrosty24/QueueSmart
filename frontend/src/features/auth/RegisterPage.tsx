@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { TextField } from '../../components/TextField'
 import { useForm } from '../../hooks/useForm'
+import { errorMessage } from '../../lib/api'
 import { AuthLayout } from './AuthLayout'
 import { useAuth } from './AuthProvider'
 import { register } from './authApi'
@@ -18,11 +19,12 @@ export function RegisterPage() {
     onSubmit: async ({ email, password }) => {
       setError(null)
       try {
-        // New accounts are signed in right away.
-        signIn(await register({ email, password }))
-        navigate('/dashboard', { replace: true })
-      } catch {
-        setError('Could not create your account. Please try again.')
+        // New accounts are signed in right away. The server picks the role.
+        const session = await register({ email, password })
+        signIn(session)
+        navigate(session.user.role === 'admin' ? '/admin' : '/dashboard', { replace: true })
+      } catch (err) {
+        setError(errorMessage(err, 'Could not create your account. Please try again.'))
       }
     },
   })
@@ -55,7 +57,7 @@ export function RegisterPage() {
           label="Password"
           type="password"
           autoComplete="new-password"
-          hint={`At least ${PASSWORD_MIN_LENGTH} characters, with a letter and a number.`}
+          hint={`At least ${PASSWORD_MIN_LENGTH} characters, with an uppercase letter and a special character (like ! or #).`}
           {...fieldProps('password')}
         />
         <TextField
