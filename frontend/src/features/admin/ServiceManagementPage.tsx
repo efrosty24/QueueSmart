@@ -17,7 +17,7 @@ import './admin.css'
 
 // Lets admins create new services and edit the details of existing ones.
 export function ServiceManagementPage() {
-  const { user, signOut } = useAuth()
+  const { user, token, signOut } = useAuth()
   const navigate = useNavigate()
   const [services, setServices] = useState<Service[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -30,7 +30,7 @@ export function ServiceManagementPage() {
 
   useEffect(() => {
     let cancelled = false
-    fetchServices()
+    fetchServices(token)
       .then((data) => {
         if (!cancelled) setServices(data)
       })
@@ -40,7 +40,7 @@ export function ServiceManagementPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [token])
 
   const handleSignOut = () => {
     signOut()
@@ -48,14 +48,14 @@ export function ServiceManagementPage() {
   }
 
   const handleCreate = async (input: ServiceInput) => {
-    const created = await createService(input)
+    const created = await createService(input, token)
     setServices((current) => (current ? [...current, created] : [created]))
     setIsCreating(false)
   }
 
   const handleUpdate = async (input: ServiceInput) => {
     if (!editingService) return
-    const updated = await updateService(editingService.id, input)
+    const updated = await updateService(editingService.id, input, token)
     setServices((current) => current?.map((service) => (service.id === updated.id ? updated : service)) ?? current)
     setEditingService(null)
   }
@@ -64,7 +64,7 @@ export function ServiceManagementPage() {
     if (!deleteTarget) return
     setIsDeleting(true)
     try {
-      await deleteService(deleteTarget.id)
+      await deleteService(deleteTarget.id, token)
       setServices((current) => current?.filter((service) => service.id !== deleteTarget.id) ?? current)
       setIsDeleteOpen(false)
     } catch {
@@ -114,6 +114,7 @@ export function ServiceManagementPage() {
 
         <section className="service-list" aria-label="Services">
           {services === null && !error && <p className="service-list__loading">Loading services…</p>}
+          {services?.length === 0 && <p>No services yet. Add a service to get started.</p>}
           {services?.map((service) => (
             <article key={service.id} className="service-card glass">
               <div className="service-card__info">

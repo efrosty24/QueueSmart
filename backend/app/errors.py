@@ -13,6 +13,8 @@ _MESSAGES = {
     "missing": "This field is required.",
     "string_type": "Must be text.",
     "string_too_long": "This value is too long.",
+    "string_too_short": "This field is required.",
+    "int_type": "Must be a whole number.",
     "extra_forbidden": "Unknown field.",
     "model_attributes_type": "Request body must be a JSON object.",
     "json_invalid": "Request body is not valid JSON.",

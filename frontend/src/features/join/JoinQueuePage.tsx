@@ -5,31 +5,29 @@ import { ClinicServiceCard } from '../../components/ClinicServiceCard'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PageHeader } from '../../components/PageHeader'
 import { formatMinutes } from '../../lib/format'
-import { serviceQueues } from '../../mocks/serviceQueues'
-import { services, type ServiceId } from '../../mocks/services'
 import { QueueStatusBadge } from '../queue/QueueStatusBadge'
 import { useQueue } from '../queue/QueueProvider'
+import { useServices } from '../services/useServices'
 import './join.css'
 
 export function JoinQueuePage() {
   const [params] = useSearchParams()
-  const [selected, setSelected] = useState<ServiceId | ''>(() => {
-    const requested = params.get('service') ?? ''
-    return Object.hasOwn(services, requested) ? requested as ServiceId : ''
-  })
+  const [selected, setSelected] = useState(() => params.get('service') ?? '')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [confirmLeave, setConfirmLeave] = useState(false)
   const { queue, joinQueue, leaveQueue } = useQueue()
+  const { services, loading, error: servicesError } = useServices()
+  const selectedService = services.find((service) => service.id === selected)
   const active = queue && queue.status !== 'served'
 
   function handleJoin(event: FormEvent) {
     event.preventDefault()
     setNotice('')
-    if (!selected) { setError('Select a clinic service before joining.'); return }
-    const issue = joinQueue(selected)
+    if (!selectedService) { setError('Select a clinic service before joining.'); return }
+    const issue = joinQueue(selectedService)
     setError(issue ?? '')
-    if (!issue) setNotice(`You joined the ${services[selected].name} queue. Your position will update automatically.`)
+    if (!issue) setNotice(`You joined the ${selectedService.name} queue. Your position will update automatically.`)
   }
 
   function handleLeave() {
@@ -44,6 +42,9 @@ export function JoinQueuePage() {
     <>
       <PageHeader title="Join a queue" description="Choose the campus clinic service you need and check the wait before joining." />
       {notice && <p className="alert alert-success" role="status">{notice}</p>}
+      {loading && <p role="status">Loading services…</p>}
+      {servicesError && <p className="alert alert-error" role="alert">{servicesError}</p>}
+      {!loading && !servicesError && services.length === 0 && <p>No clinic services are available yet.</p>}
       <div className="join-layout">
         <section className="join-panel glass" aria-labelledby="join-service-title">
           <h2 id="join-service-title">Choose a clinic service</h2>
@@ -53,20 +54,20 @@ export function JoinQueuePage() {
               <label htmlFor="clinic-service">Clinic service <span className="join-muted">(required)</span></label>
               <select id="clinic-service" value={selected} required aria-invalid={Boolean(error)}
                 aria-describedby={error ? 'join-error' : 'join-service-help'}
-                onChange={(event) => { setSelected(event.target.value as ServiceId | ''); setError(''); setNotice('') }}>
+                onChange={(event) => { setSelected(event.target.value); setError(''); setNotice('') }}>
                 <option value="">Select a service</option>
-                {Object.values(services).map((service) => (
-                  <option key={service.id} value={service.id} disabled={!serviceQueues[service.id].open}>
-                    {service.name}{serviceQueues[service.id].open ? '' : ' — closed'}
+                {services.map((service) => (
+                  <option key={service.id} value={service.id} disabled={service.status !== 'open'}>
+                    {service.name}{service.status === 'open' ? '' : ' — closed'}
                   </option>
                 ))}
               </select>
               <p id="join-service-help" className="join-muted">Closed services are unavailable to join.</p>
               {error && <p id="join-error" className="alert alert-error" role="alert">{error}</p>}
             </div>
-            {selected && <ClinicServiceCard serviceId={selected} />}
+            {selectedService && <ClinicServiceCard service={selectedService} />}
             {active && <p className="alert alert-warning">You're already in the {queue.service.name} queue. Leave your current queue before joining another.</p>}
-            <button className="btn btn-primary" type="submit" disabled={Boolean(active) || Boolean(selected && !serviceQueues[selected].open)}>
+            <button className="btn btn-primary" type="submit" disabled={Boolean(active) || loading || Boolean(servicesError) || selectedService?.status !== 'open'}>
               Join queue <LuArrowRight aria-hidden="true" />
             </button>
           </form>

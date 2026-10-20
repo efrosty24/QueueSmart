@@ -1,27 +1,7 @@
-// Placeholder admin data, held in memory. There is no backend yet.
-// TODO: replace with real calls to the queue endpoints once the backend exists.
+export { createService, deleteService, fetchServices, setQueueStatus, updateService } from '../services/serviceApi'
+export type { QueueStatus, PriorityLevel, Service, ServiceInput } from '../services/serviceApi'
 
-export type QueueStatus = 'open' | 'closed'
-export type PriorityLevel = 'low' | 'medium' | 'high'
-
-export type Service = {
-  id: string
-  name: string
-  description: string
-  expectedDurationMinutes: number
-  priority: PriorityLevel
-  queueLength: number
-  status: QueueStatus
-}
-
-// Fields an admin fills in on the create/edit form. queueLength and status are
-// managed separately (joining a queue, opening/closing it).
-export type ServiceInput = {
-  name: string
-  description: string
-  expectedDurationMinutes: number
-  priority: PriorityLevel
-}
+// Queue actions remain a frontend demo until Module 3 is implemented.
 
 // A single person waiting in a service's queue, front of the line first.
 export type QueueEntry = {
@@ -29,44 +9,6 @@ export type QueueEntry = {
   name: string
   joinedMinutesAgo: number
 }
-
-// Service records as stored; queueLength isn't kept here; it's derived from `queues` below.
-type ServiceRecord = Omit<Service, 'queueLength'>
-
-let services: ServiceRecord[] = [
-  {
-    id: 'general',
-    name: 'General Checkup',
-    description: 'Routine checkups and general health concerns.',
-    expectedDurationMinutes: 20,
-    priority: 'medium',
-    status: 'open',
-  },
-  {
-    id: 'pharmacy',
-    name: 'Pharmacy Pickup',
-    description: 'Pick up prescriptions ordered by a clinician.',
-    expectedDurationMinutes: 5,
-    priority: 'low',
-    status: 'open',
-  },
-  {
-    id: 'lab',
-    name: 'Lab Draw',
-    description: 'Blood draws and specimen collection for lab tests.',
-    expectedDurationMinutes: 10,
-    priority: 'medium',
-    status: 'closed',
-  },
-  {
-    id: 'counseling',
-    name: 'Counseling Walk-in',
-    description: 'Same-day mental health support, no appointment needed.',
-    expectedDurationMinutes: 30,
-    priority: 'high',
-    status: 'open',
-  },
-]
 
 const namePool = [
   'Jordan Lee',
@@ -91,58 +33,18 @@ function buildQueue(serviceId: string, count: number): QueueEntry[] {
 }
 
 const queues: Record<string, QueueEntry[]> = {
-  general: buildQueue('general', 8),
-  pharmacy: buildQueue('pharmacy', 3),
-  lab: buildQueue('lab', 0),
-  counseling: buildQueue('counseling', 5),
-}
-
-function toService(record: ServiceRecord): Service {
-  return { ...record, queueLength: queues[record.id]?.length ?? 0 }
+  'sick-visit': buildQueue('sick-visit', 4),
+  'flu-shot': buildQueue('flu-shot', 2),
+  'prescription-refill': [],
+  'lab-work': [],
 }
 
 const simulateRequest = () => new Promise((resolve) => setTimeout(resolve, 400))
 
-export async function fetchServices(): Promise<Service[]> {
-  await simulateRequest()
-  return services.map(toService)
-}
-
-export async function setQueueStatus(id: string, status: QueueStatus): Promise<Service> {
-  await simulateRequest()
-  services = services.map((service) => (service.id === id ? { ...service, status } : service))
-  const updated = services.find((service) => service.id === id)
-  if (!updated) throw new Error(`Unknown service: ${id}`)
-  return toService(updated)
-}
-
-// New services start closed with an empty queue until an admin opens them.
-export async function createService(input: ServiceInput): Promise<Service> {
-  await simulateRequest()
-  const record: ServiceRecord = { id: crypto.randomUUID(), ...input, status: 'closed' }
-  services = [...services, record]
-  queues[record.id] = []
-  return toService(record)
-}
-
-export async function updateService(id: string, input: ServiceInput): Promise<Service> {
-  await simulateRequest()
-  services = services.map((service) => (service.id === id ? { ...service, ...input } : service))
-  const updated = services.find((service) => service.id === id)
-  if (!updated) throw new Error(`Unknown service: ${id}`)
-  return toService(updated)
-}
-
-export async function deleteService(id: string): Promise<void> {
-  await simulateRequest()
-  if (!services.some((service) => service.id === id)) throw new Error(`Unknown service: ${id}`)
-  services = services.filter((service) => service.id !== id)
-  delete queues[id]
-}
-
 export async function fetchQueue(serviceId: string): Promise<QueueEntry[]> {
   await simulateRequest()
-  return (queues[serviceId] ?? []).map((entry) => ({ ...entry }))
+  const entries = queues[serviceId] ??= []
+  return entries.map((entry) => ({ ...entry }))
 }
 
 export async function moveQueueEntry(

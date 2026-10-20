@@ -1,9 +1,10 @@
-// Client-side checks only, for fast feedback. The FastAPI backend will have to re-validate everything.
+// Client-side feedback; the FastAPI backend also validates every field.
 import type { PriorityLevel } from './adminApi'
 
 export type FieldErrors<T extends string> = Partial<Record<T, string>>
 
 export const SERVICE_NAME_MAX_LENGTH = 100
+export const SERVICE_DESCRIPTION_MAX_LENGTH = 1000
 export const MIN_DURATION_MINUTES = 1
 export const MAX_DURATION_MINUTES = 480 // 8 hours; a generous ceiling for a single service
 
@@ -21,6 +22,7 @@ export function validateServiceName(name: string): string | undefined {
 
 export function validateServiceDescription(description: string): string | undefined {
   if (!description.trim()) return 'Description is required.'
+  if (description.trim().length > SERVICE_DESCRIPTION_MAX_LENGTH) return `Use at most ${SERVICE_DESCRIPTION_MAX_LENGTH} characters.`
 }
 
 export function validateDurationMinutes(durationMinutes: string): string | undefined {

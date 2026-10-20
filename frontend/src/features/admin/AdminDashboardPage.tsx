@@ -7,7 +7,7 @@ import './admin.css'
 
 // Admin landing page: every service's queue at a glance, with a quick open/close action.
 export function AdminDashboardPage() {
-  const { user, signOut } = useAuth()
+  const { user, token, signOut } = useAuth()
   const navigate = useNavigate()
   const [services, setServices] = useState<Service[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -15,7 +15,7 @@ export function AdminDashboardPage() {
 
   useEffect(() => {
     let cancelled = false
-    fetchServices()
+    fetchServices(token)
       .then((data) => {
         if (!cancelled) setServices(data)
       })
@@ -25,14 +25,14 @@ export function AdminDashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [token])
 
   const handleToggle = async (service: Service) => {
     const nextStatus = service.status === 'open' ? 'closed' : 'open'
     setPendingIds((ids) => new Set(ids).add(service.id))
     setError(null)
     try {
-      const updated = await setQueueStatus(service.id, nextStatus)
+      const updated = await setQueueStatus(service.id, nextStatus, token)
       setServices((current) => current?.map((item) => (item.id === updated.id ? updated : item)) ?? current)
     } catch {
       setError(`Could not update ${service.name}. Try again.`)

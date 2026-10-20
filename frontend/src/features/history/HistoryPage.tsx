@@ -102,7 +102,7 @@ export function HistoryPage() {
                           <ServiceIcon serviceId={visit.serviceId} />
                         </span>
                         <span>
-                          {services[visit.serviceId].name}
+                          {visit.serviceName ?? services[visit.serviceId]?.name ?? 'Clinic service'}
                           <span className="history-ticket">Ticket {visit.ticket}</span>
                         </span>
                       </span>

@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useState } from 'react'
-import type { ServiceId } from '../../mocks/services'
+import type { Service } from '../services/serviceApi'
 import { useAuth } from '../auth/AuthProvider'
 import { deriveQueueState } from './queueStatus'
 import { joinService, leaveService, QUEUE_CHANGED, readQueueSession, startDemo } from './queueSession'
@@ -27,7 +27,7 @@ export function useQueueStatus() {
   return {
     now,
     queue: entry ? deriveQueueState(entry.joinedAt, now, entry) : null,
-    joinQueue: (serviceId: ServiceId) => joinService(email, serviceId),
+    joinQueue: (service: Service) => joinService(email, service),
     leaveQueue: () => leaveService(email),
     restartDemo: () => startDemo(email),
   }

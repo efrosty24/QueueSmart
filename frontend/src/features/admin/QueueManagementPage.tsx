@@ -17,7 +17,7 @@ import './admin.css'
 // Lets admins view one service's queue at a time, reorder or remove people in
 // it, and call the next person in — all simulated, no real notifications sent.
 export function QueueManagementPage() {
-  const { user, signOut } = useAuth()
+  const { user, token, signOut } = useAuth()
   const navigate = useNavigate()
   const { serviceId } = useParams<{ serviceId?: string }>()
   const [services, setServices] = useState<Service[] | null>(null)
@@ -26,10 +26,10 @@ export function QueueManagementPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  // Load the service list once; land on the first service if the URL didn't name one.
+  // Load services for this session; land on the first if the URL didn't name one.
   useEffect(() => {
     let cancelled = false
-    fetchServices()
+    fetchServices(token)
       .then((data) => {
         if (cancelled) return
         setServices(data)
@@ -41,10 +41,9 @@ export function QueueManagementPage() {
     return () => {
       cancelled = true
     }
-    // Intentionally runs once: this only needs serviceId as it was at mount, to redirect
-    // when the URL has none yet.
+    // The service list does not depend on which queue is selected.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [token])
 
   // Load the selected service's queue whenever it changes.
   useEffect(() => {
