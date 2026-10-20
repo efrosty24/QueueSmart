@@ -1,4 +1,4 @@
-// Legacy service details for the scripted queue demo and old mock visits.
+// Legacy service details for old mock visits.
 // Live service lists come from features/services/serviceApi.ts.
 
 export type ServiceId = string

@@ -1,6 +1,6 @@
 import pytest
 
-from app.services import services
+from app.queue_store import queues
 
 
 VALID_SERVICE = {
@@ -62,7 +62,8 @@ def test_update_changes_details_and_preserves_id_status_and_count(client, admin_
 
 
 def test_estimate_uses_current_queue_count(client, patient_headers):
-    services["sick-visit"].queue_length = 1
+    for _ in range(3):
+        queues.serve_next("sick-visit")
 
     response = client.get("/api/services", headers=patient_headers)
 

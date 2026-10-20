@@ -1,46 +1,11 @@
-import {
-  DEMO_STEP_MS,
-  mockActiveQueue,
-  mockQueueTimeline,
-  type QueueEventKind,
-  type QueueTimelineStep,
-} from '../../mocks/activeQueue'
-import { services, type Service, type ServiceId } from '../../mocks/services'
-
-export type QueueEntry = {
-  id: string
-  ticket: string
-  serviceId: ServiceId
-  // Keep the selected service's details while this frontend queue demo runs.
-  service?: Service
-  joinedAt: number
-  initialPosition: number
-  demo?: boolean
-}
-
-function timelineFor(entry?: QueueEntry): QueueTimelineStep[] {
-  if (!entry || entry.demo) return mockQueueTimeline
-  const timeline: QueueTimelineStep[] = [{
-    position: entry.initialPosition,
-    kind: 'joined',
-      message: `You joined the ${(entry.service ?? services[entry.serviceId]).name} queue at position ${entry.initialPosition}.`,
-  }]
-  for (let position = entry.initialPosition - 1; position >= 1; position--) {
-    timeline.push({
-      position,
-      kind: position === ALMOST_READY_POSITION ? 'almost-ready' : 'moved',
-      message: position === 1 ? "You're next in line." : position === ALMOST_READY_POSITION
-        ? "You're almost up. Head to the clinic now." : `You moved up to position ${position}.`,
-    })
-  }
-  timeline.push({ position: null, kind: 'served', message: 'You have been served. Thanks for visiting!' })
-  return timeline
-}
+import type { QueueEntryResponse, QueueEventKind } from './queueApi'
 
 export type QueueStatus = 'waiting' | 'almost-ready' | 'served'
 
-// Positions at or below this count as "almost ready".
+// Positions at or below this count as "almost ready" (matches the backend).
 export const ALMOST_READY_POSITION = 2
+
+export const CLINIC_LOCATION = 'Campus Health Center, front desk'
 
 export const statusLabels: Record<QueueStatus, string> = {
   waiting: 'Waiting',
@@ -56,9 +21,10 @@ export type QueueUpdate = {
 }
 
 export type QueueState = {
+  id: string
   ticket: string
   location: string
-  service: Service
+  service: { id: string; name: string; expectedMinutes: number }
   joinedAt: number
   position: number | null
   peopleAhead: number
@@ -73,27 +39,18 @@ export function statusForPosition(position: number | null): QueueStatus {
   return position <= ALMOST_READY_POSITION ? 'almost-ready' : 'waiting'
 }
 
-// Builds the current state of the mock queue entry from when the demo started.
-export function deriveQueueState(startedAt: number, now: number, entry?: QueueEntry): QueueState {
-  const timeline = timelineFor(entry)
-  const lastStep = timeline.length - 1
-  const stepIndex = Math.min(Math.max(0, Math.floor((now - startedAt) / DEMO_STEP_MS)), lastStep)
-  const { position } = timeline[stepIndex]
-  const service = entry?.service ?? services[entry?.serviceId ?? mockActiveQueue.serviceId]
-  const peopleAhead = position === null ? 0 : position - 1
-
+// Shapes the backend's queue entry for the patient screens.
+export function toQueueState(entry: QueueEntryResponse): QueueState {
   return {
-    ticket: entry?.ticket ?? mockActiveQueue.ticket,
-    location: mockActiveQueue.location,
-    service,
-    joinedAt: startedAt,
-    position,
-    peopleAhead,
-    estimatedWaitMinutes: peopleAhead * service.expectedMinutes,
-    status: statusForPosition(position),
-    updates: timeline
-      .slice(0, stepIndex + 1)
-      .map((step, index) => ({ id: index, kind: step.kind, message: step.message, at: startedAt + index * DEMO_STEP_MS }))
-      .reverse(),
+    id: entry.id,
+    ticket: entry.ticket,
+    location: CLINIC_LOCATION,
+    service: { id: entry.serviceId, name: entry.serviceName, expectedMinutes: entry.expectedDurationMinutes },
+    joinedAt: Date.parse(entry.joinedAt),
+    position: entry.position,
+    peopleAhead: entry.peopleAhead,
+    estimatedWaitMinutes: entry.estimatedWaitMinutes,
+    status: entry.status === 'served' ? 'served' : statusForPosition(entry.position),
+    updates: entry.updates.map((update) => ({ ...update, at: Date.parse(update.at) })),
   }
 }
