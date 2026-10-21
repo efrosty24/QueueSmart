@@ -1,88 +1,81 @@
-// NotificationsProvider component for managing app notifications.
-
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { errorMessage } from '../../lib/api'
 import { useAuth } from '../auth/AuthProvider'
-import type { QueueEventKind } from '../queue/queueApi'
 import { useQueue } from '../queue/QueueProvider'
-
-type AppNotification = {
-  id: string
-  category: 'queue' | 'status'
-  title: string
-  message: string
-  at: number
-  read: boolean
-}
+import { fetchNotifications, markAllNotificationsRead, setNotificationRead, type AppNotification } from './notificationsApi'
 
 type NotificationsContextValue = {
   notifications: AppNotification[]
   unreadCount: number
-  markRead: (id: string) => void
-  markAllRead: () => void
+  loading: boolean
+  error: string | null
+  markRead: (id: string) => Promise<void>
+  markAllRead: () => Promise<void>
 }
 
-const titles: Record<QueueEventKind, string> = {
-  joined: 'Waiting',
-  moved: 'Position updated',
-  delayed: 'Queue delayed',
-  'almost-ready': 'Almost ready',
-  served: 'Served',
-}
+const NotificationsContext = createContext<NotificationsContextValue | null>(null)
 
-const NotificationsContext =
-  createContext<NotificationsContextValue | null>(null)
-
+// The backend owns both the notification feed and read state, even across logins.
 export function NotificationsProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
+  const { token } = useAuth()
   const { queue } = useQueue()
-  const [readIds, setReadIds] = useState<Set<string>>(() => new Set())
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const requestVersion = useRef(0)
 
-  const ticket = queue ? `Ticket ${queue.ticket}` : ''
-  const service = queue?.service.name ?? ''
-
-  const adminMessages: Record<QueueEventKind, string> = {
-    joined: `${ticket} joined the ${service} queue.`,
-    moved: `${ticket} moved forward in the ${service} queue.`,
-    delayed: `An urgent case changed the queue order for ${service}.`,
-    'almost-ready': `${ticket} is almost ready for ${service}.`,
-    served: `${ticket} was marked as served for ${service}.`,
-  }
-
-  const notifications = queue ? queue.updates.map<AppNotification>((update) => {
-    const id = `${queue.joinedAt}:${queue.ticket}:${update.id}`
-
-    return {
-      id,
-      category:
-        update.kind === 'moved' || update.kind === 'delayed'
-          ? 'queue'
-          : 'status',
-      title: titles[update.kind],
-      message:
-        user?.role === 'admin'
-          ? adminMessages[update.kind]
-          : `${service}: ${update.message}`,
-      at: update.at,
-      read: readIds.has(id),
+  const refresh = useCallback(async (isActive: () => boolean = () => true) => {
+    const version = ++requestVersion.current
+    const isLatest = () => isActive() && version === requestVersion.current
+    try {
+      const items = await fetchNotifications(token)
+      if (!isLatest()) return
+      setNotifications(items)
+      setError(null)
+    } catch (err) {
+      if (isLatest()) setError(errorMessage(err, 'Could not load notifications.'))
+    } finally {
+      if (isLatest()) setLoading(false)
     }
-  }) : []
+  }, [token])
 
-  const unreadCount = notifications.filter((item) => !item.read).length
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    const load = () => { void refresh(() => !cancelled) }
+    load()
+    const timer = setInterval(load, 3000)
+    window.addEventListener('focus', load)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+      window.removeEventListener('focus', load)
+    }
+  }, [refresh, token, queue?.id, queue?.status])
 
-  const markRead = (id: string) => {
-    setReadIds((current) => new Set([...current, id]))
+  async function markRead(id: string) {
+    ++requestVersion.current
+    try {
+      await setNotificationRead(id, token)
+      await refresh()
+    } catch (err) {
+      setError(errorMessage(err, 'Could not mark the notification as read.'))
+    }
   }
 
-  const markAllRead = () => {
-    setReadIds(
-      (current) => new Set([...current, ...notifications.map((item) => item.id)]),
-    )
+  async function markAllRead() {
+    ++requestVersion.current
+    try {
+      await markAllNotificationsRead(token)
+      await refresh()
+    } catch (err) {
+      setError(errorMessage(err, 'Could not mark notifications as read.'))
+    }
   }
 
   return (
-    <NotificationsContext.Provider
-      value={{ notifications, unreadCount, markRead, markAllRead }}
-    >
+    <NotificationsContext.Provider value={{ notifications, unreadCount: notifications.filter((item) => !item.read).length,
+      loading, error, markRead, markAllRead }}>
       {children}
     </NotificationsContext.Provider>
   )
@@ -91,12 +84,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 // eslint-disable-next-line react/only-export-components
 export function useNotifications() {
   const context = useContext(NotificationsContext)
-
-  if (!context) {
-    throw new Error(
-      'useNotifications must be used inside NotificationsProvider',
-    )
-  }
-
+  if (!context) throw new Error('useNotifications must be used inside NotificationsProvider')
   return context
 }

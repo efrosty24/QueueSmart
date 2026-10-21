@@ -3,11 +3,9 @@ import { LuInbox } from 'react-icons/lu'
 import { PageHeader } from '../../components/PageHeader'
 import { ServiceIcon } from '../../components/ServiceIcon'
 import { formatDate, formatMinutes, formatTime } from '../../lib/format'
-import type { VisitOutcome } from '../../mocks/history'
-import { services } from '../../mocks/services'
-import { useAuth } from '../auth/AuthProvider'
-import { useQueue } from '../queue/QueueProvider'
-import { getHistory, outcomeLabels, summarize } from './history'
+import type { VisitOutcome } from './historyApi'
+import { outcomeLabels, summarize } from './history'
+import { useHistory } from './useHistory'
 import { OutcomeBadge } from './OutcomeBadge'
 import './history.css'
 
@@ -21,10 +19,7 @@ const filters: { value: Filter; label: string }[] = [
 ]
 
 export function HistoryPage() {
-  const { user } = useAuth()
-  // Keep completed visits current even when this page stays open.
-  const { now } = useQueue()
-  const visits = getHistory(now, user?.email)
+  const { visits, loading, error } = useHistory()
   const [filter, setFilter] = useState<Filter>('all')
   const summary = summarize(visits)
   const shown = filter === 'all' ? visits : visits.filter((visit) => visit.outcome === filter)
@@ -32,6 +27,8 @@ export function HistoryPage() {
   return (
     <>
       <PageHeader title="History" description="Clinic queues you've joined before." />
+      {loading && <p role="status">Loading visit history…</p>}
+      {error && <p className="alert alert-error" role="alert">{error}</p>}
 
       <dl className="history-summary">
         <div className="history-summary__item glass">
@@ -66,12 +63,12 @@ export function HistoryPage() {
           </div>
         </div>
 
-        {shown.length === 0 ? (
+        {shown.length === 0 && !loading && !error ? (
           <div className="history-empty">
             <LuInbox aria-hidden="true" />
-            <p>No visits match this filter.</p>
+            <p>{visits.length === 0 ? 'No past visits yet. Completed visits and queues you leave will appear here.' : 'No visits match this filter.'}</p>
           </div>
-        ) : (
+        ) : shown.length > 0 ? (
           <table className="history-table" role="table">
             {/* Explicit roles keep table semantics when rows turn into cards on small screens. */}
             <caption className="visually-hidden">
@@ -102,7 +99,7 @@ export function HistoryPage() {
                           <ServiceIcon serviceId={visit.serviceId} />
                         </span>
                         <span>
-                          {visit.serviceName ?? services[visit.serviceId]?.name ?? 'Clinic service'}
+                          {visit.serviceName}
                           <span className="history-ticket">Ticket {visit.ticket}</span>
                         </span>
                       </span>
@@ -116,7 +113,7 @@ export function HistoryPage() {
               })}
             </tbody>
           </table>
-        )}
+        ) : null}
       </section>
     </>
   )

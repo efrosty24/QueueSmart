@@ -1,19 +1,9 @@
-import { mockHistory, type PastVisit, type VisitOutcome } from '../../mocks/history'
-import { loadSession } from '../auth/session'
-import { queueVisits } from '../queue/queueSession'
+import type { PastVisit, VisitOutcome } from './historyApi'
 
 export const outcomeLabels: Record<VisitOutcome, string> = {
   served: 'Served',
   left: 'Left queue',
   'no-show': 'No-show',
-}
-
-// Past visits, newest first. Once clinic staff serve the patient (or they
-// leave a queue), today's visit shows up here too.
-// `now` is unused, but callers pass it so the list re-reads as the queue changes.
-export function getHistory(_now = Date.now(), email = loadSession()?.email ?? ''): PastVisit[] {
-  const visits = [...mockHistory, ...queueVisits(email)]
-  return visits.sort((a, b) => Date.parse(b.joinedAt) - Date.parse(a.joinedAt))
 }
 
 export function summarize(visits: PastVisit[]) {
