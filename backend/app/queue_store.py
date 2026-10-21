@@ -10,6 +10,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import uuid4
 
+from .history_store import HistoryStore
+from .notification_store import NotificationKind, NotificationStore
+
 EntryPriority = Literal["normal", "urgent"]
 EntryStatus = Literal["waiting", "served", "left"]
 UpdateKind = Literal["joined", "moved", "delayed", "almost-ready", "served"]
@@ -72,6 +75,8 @@ class QueueStore:
         self._arrivals = 0
         # FastAPI runs sync endpoints in a thread pool, so guard changes.
         self._lock = threading.Lock()
+        self.notifications = NotificationStore()
+        self.history = HistoryStore()
 
     def waiting(self, service_id: str) -> list[QueueEntry]:
         """The service's line, front first: urgent before normal, then arrival order."""
@@ -101,7 +106,9 @@ class QueueStore:
             )
             self._entries[entry.id] = entry
             self._reposition(service_id, now)
-            entry.add_update("joined", f"You joined the {service_name} queue at position {entry.position}.", now)
+            self._add_update(entry, "joined", f"You joined the {service_name} queue at position {entry.position}.", now)
+            if entry.position <= ALMOST_READY_POSITION:
+                self._notify(entry, "almost-ready", "You're almost up. Head to the clinic now.", now)
             return entry
 
     def leave(self, user_id: str, now: datetime | None = None) -> QueueEntry:
@@ -123,7 +130,7 @@ class QueueStore:
                 return None
             entry = line[0]
             self._finish(entry, "served", now)
-            entry.add_update("served", "You have been served. Thanks for visiting!", now)
+            self._add_update(entry, "served", "You have been served. Thanks for visiting!", now)
             self._reposition(service_id, now)
             return entry
 
@@ -151,17 +158,35 @@ class QueueStore:
         with self._lock:
             self._entries.clear()
             self._arrivals = 0
+            self.notifications.reset()
+            self.history.reset()
         now = datetime.now(UTC)
         for service_id, (name, duration, people) in _SEED_QUEUES.items():
             for index, person in enumerate(people):
                 self.join(service_id, name, duration, f"demo-{person}", f"{person}@university.edu",
                           now - timedelta(minutes=(len(people) - index) * 6))
 
-    @staticmethod
-    def _finish(entry: QueueEntry, status: EntryStatus, now: datetime) -> None:
+    def _finish(self, entry: QueueEntry, status: Literal["served", "left"], now: datetime) -> None:
         entry.status = status
         entry.position = None
         entry.finished_at = now
+        self.history.record(
+            entry_id=entry.id, user_id=entry.user_id, ticket=entry.ticket,
+            service_id=entry.service_id, service_name=entry.service_name,
+            joined_at=entry.joined_at, finished_at=now, outcome=status,
+        )
+        if status == "left":
+            self._notify(entry, "left", "You left the queue. Your visit is saved to History.", now)
+
+    def _notify(self, entry: QueueEntry, kind: NotificationKind, message: str, at: datetime) -> None:
+        self.notifications.add(
+            user_id=entry.user_id, entry_id=entry.id, ticket=entry.ticket,
+            service_id=entry.service_id, service_name=entry.service_name, kind=kind, message=message, at=at,
+        )
+
+    def _add_update(self, entry: QueueEntry, kind: UpdateKind, message: str, at: datetime) -> None:
+        entry.add_update(kind, message, at)
+        self._notify(entry, kind, message, at)
 
     def _reposition(self, service_id: str, now: datetime) -> None:
         """Renumbers the line and tells everyone whose place changed."""
@@ -170,13 +195,15 @@ class QueueStore:
             if previous is None or position == previous:
                 continue
             if position > previous:
-                entry.add_update("delayed", f"The queue order changed, so you moved back to position {position}.", now)
+                self._add_update(entry, "delayed", f"The queue order changed, so you moved back to position {position}.", now)
             elif position == 1:
-                entry.add_update("moved", "You're next in line.", now)
+                self._add_update(entry, "moved", "You're next in line.", now)
+                if previous > ALMOST_READY_POSITION:
+                    self._notify(entry, "almost-ready", "You're almost up. Head to the clinic now.", now)
             elif position <= ALMOST_READY_POSITION:
-                entry.add_update("almost-ready", "You're almost up. Head to the clinic now.", now)
+                self._add_update(entry, "almost-ready", "You're almost up. Head to the clinic now.", now)
             else:
-                entry.add_update("moved", f"You moved up to position {position}.", now)
+                self._add_update(entry, "moved", f"You moved up to position {position}.", now)
 
 
 queues = QueueStore()

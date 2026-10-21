@@ -1,6 +1,6 @@
 import type { IconType } from 'react-icons'
 import { LuCircleCheck, LuDoorOpen, LuUserX } from 'react-icons/lu'
-import type { VisitOutcome } from '../../mocks/history'
+import type { VisitOutcome } from './historyApi'
 import { outcomeLabels } from './history'
 
 const styles: Record<VisitOutcome, { className: string; icon: IconType }> = {

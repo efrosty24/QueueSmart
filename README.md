@@ -23,6 +23,10 @@ backend/
 │   ├── queue_store.py   # in-memory queues: ordering, join/leave/serve, position updates
 │   ├── queues.py        # /api/queues routes for patients and admins
 │   ├── wait_time.py     # reusable people-ahead × duration calculation
+│   ├── notifications.py # authenticated notification/read-state endpoints (Module 5)
+│   ├── notification_store.py # in-memory notifications triggered by queue changes
+│   ├── history.py       # authenticated visit-history endpoint (Module 6)
+│   ├── history_store.py # in-memory completed/left visits
 │   └── auth/            # Authentication module
 │       ├── router.py        # /api/auth endpoints
 │       ├── schemas.py       # request/response models
@@ -42,14 +46,15 @@ frontend/src/
 ├── theme/           # design tokens, panel styles, light/dark/system logic
 ├── components/      # shared UI (AppShell sidebar, ConfirmDialog, PageHeader, TextField, ...)
 ├── lib/             # API client (api.ts) and small helpers (date/time formatting)
-├── mocks/           # mock data: legacy service names, past visit history
+├── mocks/           # legacy A2 samples; history and notifications now use the API
 └── features/
     ├── auth/        # login, registration, validation, session, route guards (calls the backend)
     ├── services/    # shared service API calls and patient service loading
     ├── dashboard/   # overview: current queue + recent visits
     ├── join/        # service selection, wait estimates, join/leave controls
     ├── queue/       # queue API calls, polling hook, Queue status screen
-    └── history/     # History screen
+    ├── notifications/ # notification API, provider and screens
+    └── history/     # visit-history API, polling hook and screen
 ```
 
 Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.md) before writing UI.**
@@ -71,18 +76,13 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 - **History** (`/history`): past queues with date, service, wait and outcome (Served, Left queue, No-show), summary totals, and an outcome filter.
 - Light, dark and system themes: red brand color on solid neutral backgrounds.
 
-### Mock data
+### Backend data
 
-Authentication, service management and queues run on the backend (see [Backend API](#backend-api)). Notifications and history are still frontend demos:
-
-| File | What it fakes |
-|---|---|
-| `services.ts` | Legacy service names for old mock visits; live service lists use the API |
-| `history.ts` | 12 past visits across the fall semester |
+Authentication, services, queues, notifications and history all use the backend (see [Backend API](#backend-api)). The old A2 history samples are no longer displayed.
 
 - **Queue state** comes from the backend. A queue only moves when an admin serves someone, someone leaves, or a patient is marked urgent. To try it, sign in as the student in one browser and as the admin in another (or a private window), then serve the student from `/admin/queue`.
-- **History:** visits you finish (served or left) are added to the mock history in that browser tab. The backend doesn't store history yet.
-- **Notifications** are built from the backend's queue updates for your current entry.
+- **History:** the server records served and left visits, including when an admin deletes an occupied service. It retains the service name, ticket, timestamps, outcome and actual elapsed wait. Records remain after joining another queue, changing browsers or signing in again, until the backend restarts.
+- **Notifications:** the server records queue events, including joining and becoming close to being served (position 1 or 2). The feed remains available after leaving or joining another queue. Read/unread state is stored on the server. The UI checks notifications and history every 3 seconds and when the tab regains focus.
 - Patient service lists reload when the page opens or the tab regains focus.
 
 ## Setup
@@ -155,7 +155,7 @@ Then open http://localhost:8080 (not 5173). nginx serves the frontend and forwar
 
 ## Backend API
 
-No database yet (Assignment 4): accounts, sessions, services and queues live in memory and reset when the server restarts. Run one backend process so requests share that memory.
+No database yet (Assignment 4): accounts, sessions, services, queues, notifications and history live in memory and reset when the server restarts. Run one backend process so requests share that memory.
 
 ### Demo accounts
 
@@ -194,7 +194,7 @@ Service responses include `id`, `name`, `description`, `expectedDurationMinutes`
 
 Names and descriptions are required text, trimmed before validation, with limits of 100 and 1,000 characters. Duration must be a whole number from 1 to 480 (strings, decimals and booleans are rejected). Priority must be `low`, `medium` or `high`. Unknown fields are rejected. Invalid input returns `422` with field errors, missing services return `404`, missing/invalid sessions return `401`, and patient changes return `403`.
 
-The service tests cover create/list/update/delete, availability, permissions, validation boundaries, and rejected requests leaving data unchanged. Deleting a service also removes everyone waiting in its queue. Notifications and history backend endpoints belong to later modules.
+The service tests cover create/list/update/delete, availability, permissions, validation boundaries, and rejected requests leaving data unchanged. Deleting a service also removes everyone waiting in its queue, records their Left queue history, and notifies them.
 
 ### Queue endpoints (Module 3)
 
@@ -232,6 +232,28 @@ Service previews pass `queueLength` as the number of people ahead. For example, 
 The queue endpoints (Module 3) reuse the same helper for each entry by passing `position - 1` and the service duration. A person at position 1 has no one ahead and waits zero estimated minutes.
 
 Tests cover normal estimates, zero wait, invalid values, changed queue counts and durations, and preventing clients from overriding the calculated field.
+
+### Notification endpoints (Module 5)
+
+All requests require `Authorization: Bearer <token>`. Each account sees and changes only its own notifications. No email or SMS is sent.
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| `GET` | `/api/notifications` | — | `200` notifications, newest first |
+| `PATCH` | `/api/notifications/{id}/read` | `{read: true}` or `{read: false}` | `200` updated notification |
+| `POST` | `/api/notifications/read-all` | — | `204`, all of your current notifications marked read |
+
+A notification contains `id`, `entryId`, `ticket`, `serviceId`, `serviceName`, `kind`, `category`, `title`, `message`, `at` and `read`. Kinds are `joined`, `moved`, `delayed`, `almost-ready`, `served` and `left`. Mutating a queue triggers notifications on the server; reading an endpoint never generates duplicate events. An immediate position of 1 or 2 on joining also triggers an `almost-ready` alert. Priority changes that move someone directly to the front trigger it too.
+
+The read flag is a required JSON boolean; strings, numbers, nulls and extra fields return `422`. Notification IDs must be UUIDs; malformed/overlong IDs return `422`. Unknown IDs and another account's IDs both return `404`. Missing or invalid sessions return `401`.
+
+### History endpoint (Module 6)
+
+`GET /api/history` requires a bearer token and returns only the current account's completed queue visits, newest completion first. New accounts start with an empty history. Waiting entries are shown on Queue status, and enter history once served or left.
+
+Each record contains `id` (the queue entry ID), `ticket`, `serviceId`, `serviceName`, `joinedAt`, `finishedAt`, `outcome` (`served` or `left`), and `waitedMinutes` (elapsed whole minutes, rounded down, never negative). Service details are retained even after a service is renamed or deleted. Rejoining does not erase earlier visits. History is created by the backend queue operations even if the student has closed the browser; clients cannot submit fabricated completion records. Missing or invalid sessions return `401`.
+
+The Module 5/6 tests cover join and near-turn triggers, serving, leaving, priority changes, duplicate/failed operations, account isolation, read-state validation, history ordering and wait calculation, service deletion, and resetting the in-memory stores. Run the full suite with `pytest`; the existing 80% coverage requirement also applies to these modules. Backend tests are required for A3.
 
 ### Authentication rules
 

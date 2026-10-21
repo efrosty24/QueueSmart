@@ -10,7 +10,7 @@ import './notifications.css'
 export function NotificationsPanel({ preview = false }: { preview?: boolean }) {
   const titleId = useId()
   const [unreadOnly, setUnreadOnly] = useState(false)
-  const { notifications, unreadCount, markRead, markAllRead } =
+  const { notifications, unreadCount, loading, error, markRead, markAllRead } =
     useNotifications()
 
   const shown = preview
@@ -68,11 +68,13 @@ export function NotificationsPanel({ preview = false }: { preview?: boolean }) {
         </div>
       )}
 
-      {shown.length === 0 ? (
+      {loading && <p className="notifications-muted" role="status">Loading notifications…</p>}
+      {error && <p className="alert alert-error" role="alert">{error}</p>}
+      {!loading && !error && shown.length === 0 ? (
         <p className="notifications-muted">
           {unreadOnly ? 'You have no unread notifications.' : 'No notifications yet.'}
         </p>
-      ) : (
+      ) : shown.length > 0 ? (
         <ol className="notifications-list">
           {shown.map((item) => (
             <li
@@ -120,7 +122,7 @@ export function NotificationsPanel({ preview = false }: { preview?: boolean }) {
             </li>
           ))}
         </ol>
-      )}
+      ) : null}
 
       {preview && (
         <Link to="/notifications" className="notifications-link">

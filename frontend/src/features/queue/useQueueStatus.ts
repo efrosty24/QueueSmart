@@ -3,23 +3,20 @@ import { ApiError, errorMessage } from '../../lib/api'
 import type { Service } from '../services/serviceApi'
 import { useAuth } from '../auth/AuthProvider'
 import { fetchMyQueue, joinQueue, leaveQueue, type QueueEntryResponse } from './queueApi'
-import { recordVisit } from './queueSession'
 import { toQueueState } from './queueStatus'
 
 // How often to ask the backend for the patient's place in line.
 const POLL_MS = 3000
 
 export function useQueueStatus() {
-  const { user, token } = useAuth()
-  const email = user?.email ?? ''
+  const { token } = useAuth()
   const [entry, setEntry] = useState<QueueEntryResponse | null>(null)
   const [now, setNow] = useState(Date.now)
 
   const apply = useCallback((next: QueueEntryResponse | null) => {
     setEntry(next)
     setNow(Date.now())
-    if (next?.status === 'served') recordVisit(email, toQueueState(next), 'served', Date.parse(next.updates[0].at))
-  }, [email])
+  }, [])
 
   const refresh = useCallback(async () => {
     try {
@@ -62,7 +59,6 @@ export function useQueueStatus() {
     if (!queue || queue.status === 'served') return 'Your visit has already finished. You can join another service.'
     try {
       await leaveQueue(token)
-      recordVisit(email, queue, 'left')
       apply(null)
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {

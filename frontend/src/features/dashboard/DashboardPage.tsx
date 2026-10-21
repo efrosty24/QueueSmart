@@ -4,9 +4,8 @@ import { ClinicServiceCard } from '../../components/ClinicServiceCard'
 import { PageHeader } from '../../components/PageHeader'
 import { ServiceIcon } from '../../components/ServiceIcon'
 import { formatDate, formatMinutes } from '../../lib/format'
-import { services as demoServices } from '../../mocks/services'
 import { useAuth } from '../auth/AuthProvider'
-import { getHistory } from '../history/history'
+import { useHistory } from '../history/useHistory'
 import { OutcomeBadge } from '../history/OutcomeBadge'
 import { NotificationsPanel } from '../notifications/NotificationsPanel'
 import { useQueue } from '../queue/QueueProvider'
@@ -19,10 +18,10 @@ const RECENT_VISIT_COUNT = 3
 // Landing page after sign-in: current queue, recent visits, and notifications.
 export function DashboardPage() {
   const { user } = useAuth()
-  const { queue, now } = useQueue()
+  const { queue } = useQueue()
   const { services, loading, error } = useServices()
-  // Read on every render so today's visit appears as soon as the queue finishes.
-  const recentVisits = getHistory(now, user?.email).slice(0, RECENT_VISIT_COUNT)
+  const { visits, loading: historyLoading, error: historyError } = useHistory()
+  const recentVisits = visits.slice(0, RECENT_VISIT_COUNT)
 
   return (
     <>
@@ -128,7 +127,7 @@ export function DashboardPage() {
 
                 <span className="dashboard-visit__text">
                   <span className="dashboard-visit__name">
-                    {visit.serviceName ?? demoServices[visit.serviceId]?.name ?? 'Clinic service'}
+                    {visit.serviceName}
                   </span>
                   <span className="dashboard-muted">
                     {formatDate(new Date(visit.joinedAt))}
@@ -139,6 +138,10 @@ export function DashboardPage() {
               </li>
             ))}
           </ul>
+          {historyLoading && <p className="dashboard-muted" role="status">Loading recent visits…</p>}
+          {historyError && <p className="alert alert-error" role="alert">{historyError}</p>}
+          {!historyLoading && !historyError && recentVisits.length === 0 &&
+            <p className="dashboard-muted">No past visits yet. Completed visits and queues you leave will appear here.</p>}
 
           <Link to="/history" className="dashboard-link">
             See all history <LuArrowRight aria-hidden="true" />
