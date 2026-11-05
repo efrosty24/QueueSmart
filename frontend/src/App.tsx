@@ -12,6 +12,7 @@ import { HistoryPage } from './features/history/HistoryPage'
 import { JoinQueuePage } from './features/join/JoinQueuePage'
 import { NotificationsPage } from './features/notifications/NotificationsPage'
 import { NotificationsProvider } from './features/notifications/NotificationsProvider'
+import { ProfilePage } from './features/profile/ProfilePage'
 import { QueueProvider } from './features/queue/QueueProvider'
 import { QueueStatusPage } from './features/queue/QueueStatusPage'
 import { ThemeProvider } from './theme/ThemeProvider'
@@ -34,6 +35,7 @@ export default function App() {
                 <Route path="/queue" element={<QueueStatusPage />} />
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
               </Route>
             </Route>
             <Route element={<RequireAdmin />}>

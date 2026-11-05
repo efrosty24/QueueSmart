@@ -61,11 +61,18 @@ export function validateLogin(values: LoginValues): FieldErrors<LoginField> {
   }
 }
 
-export type RegisterField = 'email' | 'password' | 'confirmPassword'
+export function validateFullName(fullName: string): string | undefined {
+  const value = fullName.trim()
+  if (!value) return 'Full name is required.'
+  if (value.length > 100) return 'Use at most 100 characters.'
+}
+
+export type RegisterField = 'full_name' | 'email' | 'password' | 'confirmPassword'
 export type RegisterValues = Record<RegisterField, string>
 
 export function validateRegister(values: RegisterValues): FieldErrors<RegisterField> {
   return {
+    full_name: validateFullName(values.full_name),
     email: validateEmail(values.email),
     password: validateNewPassword(values.password),
     confirmPassword: validateConfirmPassword(values.password, values.confirmPassword),

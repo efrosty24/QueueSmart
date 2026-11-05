@@ -11,7 +11,7 @@ def _login(client, email):
 
 
 def _register(client, email):
-    response = client.post("/api/auth/register", json={"email": email, "password": "Queue$mart1"})
+    response = client.post("/api/auth/register", json={"email": email, "password": "Queue$mart1", "full_name": "Student"})
     return {"Authorization": f"Bearer {response.json()['token']}"}
 
 

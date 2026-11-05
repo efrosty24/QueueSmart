@@ -4,7 +4,7 @@ VALID_PASSWORD = "Queue$mart1"
 
 
 def register(client, email="new.student@university.edu", password=VALID_PASSWORD):
-    return client.post("/api/auth/register", json={"email": email, "password": password})
+    return client.post("/api/auth/register", json={"email": email, "password": password, "full_name": "New Student"})
 
 
 def login(client, email="student@university.edu", password=VALID_PASSWORD):
@@ -56,7 +56,7 @@ def test_register_rejects_weak_passwords(client, password, message):
 def test_register_cannot_set_its_own_role(client):
     response = client.post(
         "/api/auth/register",
-        json={"email": "sneaky@university.edu", "password": VALID_PASSWORD, "role": "admin"},
+        json={"email": "sneaky@university.edu", "password": VALID_PASSWORD, "full_name": "Student", "role": "admin"},
     )
 
     assert response.status_code == 422
@@ -70,7 +70,9 @@ def test_missing_fields_are_reported(client):
     response = client.post("/api/auth/register", json={})
 
     assert response.status_code == 422
-    assert response.json()["errors"] == {"email": "This field is required.", "password": "This field is required."}
+    assert response.json()["errors"] == {
+        "email": "This field is required.", "password": "This field is required.", "full_name": "This field is required.",
+    }
 
 
 def test_non_string_fields_are_rejected(client):

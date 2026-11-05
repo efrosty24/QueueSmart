@@ -13,8 +13,8 @@ EMAIL_LOCAL_MAX_LENGTH = 64
 # The email doubles as the username. This is an allowlist: only characters that
 # appear in normal addresses are accepted, so quotes, semicolons, equals signs,
 # spaces, slashes and asterisks (what SQL injection payloads need) can never get
-# through. There is no database yet, but A4 adds one and this rule keeps the
-# username field safe as defense in depth alongside parameterized queries.
+# through. SQL statements also bind all input as parameters; the regex is only
+# an address-format check, not the SQL-injection defense.
 _EMAIL = re.compile(
     r"^[a-z0-9._%+-]+"                # local part
     r"@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"  # first domain label

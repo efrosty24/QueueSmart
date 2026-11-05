@@ -58,6 +58,9 @@ export function AdminDashboardPage() {
       <AppHeader
         actions={
           <>
+            <Link to="/profile" className="btn btn-ghost">
+              Profile
+            </Link>
             <Link to="/admin/services" className="btn btn-ghost">
               Manage services
             </Link>

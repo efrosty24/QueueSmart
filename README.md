@@ -19,6 +19,8 @@ backend/
 ├── app/
 │   ├── main.py          # FastAPI app, routers, CORS
 │   ├── errors.py        # 422 validation error format
+│   ├── database.py      # SQLite path, connections and transactions
+│   ├── schema.sql       # UserCredentials and UserProfile table definitions
 │   ├── services.py      # service routes, validation, in-memory records
 │   ├── queue_store.py   # in-memory queues: ordering, join/leave/serve, position updates
 │   ├── queues.py        # /api/queues routes for patients and admins
@@ -34,7 +36,7 @@ backend/
 │       ├── passwords.py     # bcrypt hashing
 │       ├── roles.py         # patient vs admin
 │       ├── sessions.py      # 7-day session tokens
-│       ├── store.py         # in-memory accounts (no database yet)
+│       ├── store.py         # SQLite credentials and user profiles
 │       └── dependencies.py  # get_current_user, require_admin
 └── tests/               # pytest unit tests
 ```
@@ -61,7 +63,8 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 
 ## Features so far
 
-- **Login** (`/login`) and **Registration** (`/register`), backed by the FastAPI auth module. Email is the username.
+- **Login** (`/login`) and **Registration** (`/register`), backed by SQLite through the FastAPI auth module. Registration collects a full name, email and password. Email is the username.
+- **Profile** (`/profile`): view and update your full name, optional contact information and preferences. Saved accounts and profiles survive backend restarts. Patients open Profile from the sidebar; admins can open it from their dashboard.
 - Validation on both sides: email format (an allowlist that also blocks SQL-injection input), password rules (8–64 characters with an uppercase letter and a special character), and matching confirmation on sign-up. The server re-checks everything.
 - **Sessions:** signing in returns a token that lasts **7 days**. It's kept in the browser and re-checked with the server on every page load. **Sign out** revokes it on the server.
 - **Roles:** an account is an **admin** when the name part of its email (before the @) contains "admin"; everyone else is a patient. The role always comes from the server, and admin pages require it.
@@ -155,11 +158,21 @@ Then open http://localhost:8080 (not 5173). nginx serves the frontend and forwar
 
 ## Backend API
 
-No database yet (Assignment 4): accounts, sessions, services, queues, notifications and history live in memory and reset when the server restarts. Run one backend process so requests share that memory.
+Assignment 4's **UserCredentials** and **UserProfile** use SQLite. Sessions, services, queues, notifications and history still live in memory and reset when the server restarts. Sign in again after a backend restart; your account and profile remain saved. Run one backend process so the remaining in-memory stores are shared.
+
+### SQLite setup and schema (Assignment 4)
+
+Python's built-in `sqlite3` module handles the database; no database server or extra dependency is required. The backend automatically creates `backend/data/queuesmart.sqlite3` and its tables on first start. To use another file, set `QUEUESMART_DATABASE_PATH` before starting the backend (for example, `$env:QUEUESMART_DATABASE_PATH = 'C:\data\queuesmart.sqlite3'` in PowerShell). Parent directories are created automatically. Local database files are ignored by Git.
+
+The executable [SQL schema](backend/app/schema.sql) defines the primary keys, unique email constraint, required fields, length checks and foreign key. `UserCredentials.user_id` is a UUID; `UserProfile.email` is both its primary key and a foreign key to the unique credentials email, creating a one-to-one relationship. The database cascades email changes and account deletions to the profile. Existing API role names are retained: `patient` represents User and `admin` represents Administrator.
+
+Registration saves both records in one transaction. Passwords are stored as salted bcrypt hashes, never plaintext or reversible ciphertext. All queries bind user input as parameters. Startup inserts missing demo accounts without replacing saved account IDs, passwords or profile details. Docker Compose uses the `backend-data` volume so these records also survive container replacement.
+
+Tests always use a temporary database, separate from your saved local accounts. They cover constraints directly in SQLite, account isolation, duplicate registration (including concurrent attempts), rollback when profile creation fails, and login/profile retrieval from a new backend process. Run the test commands above for coverage; add `--cov-report=html` to generate the assignment's coverage report at `backend/htmlcov/index.html`.
 
 ### Demo accounts
 
-Created on every start (test values only):
+Inserted if missing on startup (test values only):
 
 | Email | Password | Role |
 |---|---|---|
@@ -170,13 +183,17 @@ Created on every start (test values only):
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| `POST` | `/api/auth/register` | `{email, password}` | `201` `{token, expires_at, user}`, signed in right away |
+| `POST` | `/api/auth/register` | `{full_name, email, password, contact_info?, preferences?}` | `201` `{token, expires_at, user}`, signed in right away |
 | `POST` | `/api/auth/login` | `{email, password}` | `200` `{token, expires_at, user}` |
 | `GET` | `/api/auth/me` | — | `200` `{id, email, role}` for the current token |
+| `GET` | `/api/auth/profile` | — | `200` `{user_id, email, full_name, contact_info, preferences}` for the current account |
+| `PUT` | `/api/auth/profile` | `{full_name, contact_info?, preferences?}` | `200` saved profile |
 | `POST` | `/api/auth/logout` | — | `204`, token revoked |
 | `GET` | `/api/health` | — | `200` `{status: "ok"}` |
 
 Send the token as `Authorization: Bearer <token>`. `user` is `{id, email, role}`, with `role` either `patient` or `admin`.
+
+Profile endpoints require a valid session and operate only on that session's account. Full name is required text, trimmed and limited to 100 characters. Optional contact information and preferences are trimmed text, limited to 100 and 1,000 characters; omitted, empty or null optional fields are saved as null. `PUT` replaces the editable profile details. Email, user ID, password and role cannot be changed through the profile endpoint. Unknown fields and invalid values return `422`; a missing profile returns `404`.
 
 ### Service endpoints (Module 2)
 
@@ -257,7 +274,7 @@ The Module 5/6 tests cover join and near-turn triggers, serving, leaving, priori
 
 ### Authentication rules
 
-- **Email (username):** trimmed and lowercased, at most 254 characters (64 before the @). Checked against an **allowlist** regex of characters found in real addresses, so quotes, `;`, `=`, spaces, `/` and `*` can never get through. `--` (SQL comment) and `..` are rejected too. This protects the username field from SQL injection once a database is added.
+- **Email (username):** trimmed and lowercased, at most 254 characters (64 before the @). Checked against an **allowlist** regex of characters found in real addresses, so quotes, `;`, `=`, spaces, `/` and `*` can never get through. `--` (SQL comment) and `..` are rejected too. Parameterized SQL queries protect database operations from SQL injection.
 - **Password at sign-up:** 8–64 characters (and at most 72 bytes, bcrypt's limit), with at least one uppercase letter and one special character (anything that isn't a letter, digit or space).
 - **Password at login:** required, same length cap.
 - **Types and extra fields:** values must be strings (no numbers or lists). Unknown fields are rejected, so a client can't send `"role": "admin"`.
