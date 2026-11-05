@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { LuBell, LuHistory, LuLayoutDashboard, LuListOrdered, LuLogOut, LuMenu, LuPlus, LuX } from 'react-icons/lu'
+import { LuBell, LuHistory, LuLayoutDashboard, LuListOrdered, LuLogOut, LuMenu, LuPlus, LuUser, LuX } from 'react-icons/lu'
 import { NavLink, Outlet, useNavigate } from 'react-router'
 import { useAuth } from '../features/auth/AuthProvider'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -15,6 +15,7 @@ const navItems = [
   { to: '/queue', label: 'Queue status', icon: LuListOrdered },
   { to: '/history', label: 'History', icon: LuHistory },
   { to: '/notifications', label: 'Notifications', icon: LuBell },
+  { to: '/profile', label: 'Profile', icon: LuUser },
 ]
 
 // Layout for every signed-in page: sidebar on the left, page content on the right.

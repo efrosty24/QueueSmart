@@ -2,6 +2,8 @@
 services:
   backend:
     build: ./backend
+    volumes:
+      - backend-data:/app/data
     # Only reachable from the frontend container; nginx forwards /api to it.
     expose:
       - "8000"
@@ -12,3 +14,6 @@ services:
       - "8080:80"
     depends_on:
       - backend
+
+volumes:
+  backend-data:

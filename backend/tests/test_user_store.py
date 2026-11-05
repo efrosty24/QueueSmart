@@ -6,8 +6,8 @@ from app.auth.store import SEED_EMAILS, SEED_PASSWORD, EmailTakenError, UserStor
 
 
 @pytest.fixture
-def store() -> UserStore:
-    store = UserStore()
+def store(tmp_path) -> UserStore:
+    store = UserStore(tmp_path / "accounts.sqlite3")
     store.reset()
     return store
 
@@ -22,7 +22,7 @@ def test_reset_adds_demo_accounts_with_roles(store):
 
 
 def test_create_stores_hash_not_password(store):
-    user = store.create("new.student@university.edu", "Queue$mart1")
+    user = store.create("new.student@university.edu", "Queue$mart1", "New Student")
 
     assert user.password_hash != "Queue$mart1"
     assert store.get_by_email("new.student@university.edu") == user
@@ -31,7 +31,7 @@ def test_create_stores_hash_not_password(store):
 
 def test_create_rejects_duplicate_email(store):
     with pytest.raises(EmailTakenError):
-        store.create("student@university.edu", "Queue$mart1")
+        store.create("student@university.edu", "Queue$mart1", "Duplicate Student")
 
 
 def test_lookups_return_none_when_missing(store):
@@ -40,7 +40,7 @@ def test_lookups_return_none_when_missing(store):
 
 
 def test_reset_removes_created_accounts(store):
-    store.create("temp@university.edu", "Queue$mart1")
+    store.create("temp@university.edu", "Queue$mart1", "Temporary Student")
     store.reset()
 
     assert store.get_by_email("temp@university.edu") is None

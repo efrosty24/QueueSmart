@@ -70,7 +70,9 @@ def test_login_returns_token_that_expires_in_seven_days(client):
 
 
 def test_register_signs_the_new_account_in(client):
-    body = client.post("/api/auth/register", json={"email": "new@university.edu", "password": VALID_PASSWORD}).json()
+    body = client.post("/api/auth/register", json={
+        "email": "new@university.edu", "password": VALID_PASSWORD, "full_name": "New Student",
+    }).json()
 
     response = client.get("/api/auth/me", headers=auth(body["token"]))
 

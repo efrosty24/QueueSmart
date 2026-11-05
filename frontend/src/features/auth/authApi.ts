@@ -23,7 +23,7 @@ export async function login(credentials: Credentials): Promise<StoredSession> {
   return toSession(await apiRequest<AuthResponse>('/auth/login', { method: 'POST', body: credentials }))
 }
 
-export async function register(credentials: Credentials): Promise<StoredSession> {
+export async function register(credentials: Credentials & { full_name: string }): Promise<StoredSession> {
   return toSession(await apiRequest<AuthResponse>('/auth/register', { method: 'POST', body: credentials }))
 }
 

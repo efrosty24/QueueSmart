@@ -8,7 +8,7 @@ the precise limits live in validation.py.
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictStr
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictStr, StringConstraints
 
 from .roles import Role
 from .validation import validate_email, validate_login_password, validate_new_password
@@ -21,7 +21,13 @@ class _Request(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class RegisterRequest(_Request):
+class ProfileDetails(_Request):
+    full_name: Annotated[StrictStr, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    contact_info: Annotated[StrictStr, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
+    preferences: Annotated[StrictStr, StringConstraints(strip_whitespace=True, max_length=1000)] | None = None
+
+
+class RegisterRequest(ProfileDetails):
     email: Email
     password: Annotated[StrictStr, Field(max_length=256), AfterValidator(validate_new_password)]
 
@@ -35,6 +41,11 @@ class UserOut(BaseModel):
     id: str
     email: str
     role: Role
+
+
+class ProfileOut(ProfileDetails):
+    user_id: str
+    email: str
 
 
 class AuthResponse(BaseModel):

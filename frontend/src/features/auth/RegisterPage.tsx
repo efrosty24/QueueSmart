@@ -14,13 +14,13 @@ export function RegisterPage() {
   const navigate = useNavigate()
 
   const { fieldProps, handleSubmit, submitting } = useForm({
-    initialValues: { email: '', password: '', confirmPassword: '' },
+    initialValues: { full_name: '', email: '', password: '', confirmPassword: '' },
     validate: validateRegister,
-    onSubmit: async ({ email, password }) => {
+    onSubmit: async ({ full_name, email, password }) => {
       setError(null)
       try {
         // New accounts are signed in right away. The server picks the role.
-        const session = await register({ email, password })
+        const session = await register({ full_name, email, password })
         signIn(session)
         navigate(session.user.role === 'admin' ? '/admin' : '/dashboard', { replace: true })
       } catch (err) {
@@ -45,6 +45,13 @@ export function RegisterPage() {
             {error}
           </div>
         )}
+        <TextField
+          label="Full name"
+          autoComplete="name"
+          maxLength={100}
+          required
+          {...fieldProps('full_name')}
+        />
         <TextField
           label="Email"
           type="email"

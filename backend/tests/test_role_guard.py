@@ -58,7 +58,9 @@ def test_signed_out_is_unauthorized(guarded_client, path):
 
 def test_new_admin_account_gets_access(guarded_client):
     body = guarded_client.post(
-        "/api/auth/register", json={"email": "front.desk.admin@university.edu", "password": VALID_PASSWORD}
+        "/api/auth/register", json={
+            "email": "front.desk.admin@university.edu", "password": VALID_PASSWORD, "full_name": "Front Desk Admin",
+        }
     ).json()
 
     response = guarded_client.get("/api/test-admin/param", headers={"Authorization": f"Bearer {body['token']}"})

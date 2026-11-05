@@ -107,7 +107,9 @@ def test_history_is_isolated_even_when_another_user_id_is_submitted(client):
     patient = login(client)
     client.post("/api/queues/prescription-refill/join", headers=patient)
     client.delete("/api/queues/me", headers=patient)
-    other = client.post("/api/auth/register", json={"email": "other@university.edu", "password": "Queue$mart1"}).json()
+    other = client.post("/api/auth/register", json={
+        "email": "other@university.edu", "password": "Queue$mart1", "full_name": "Other Student",
+    }).json()
     other_headers = {"Authorization": f"Bearer {other['token']}"}
     assert client.get("/api/history?userId=student", headers=other_headers).json() == []
     assert len(client.get(f"/api/history?userId={other['user']['id']}", headers=patient).json()) == 1
