@@ -12,15 +12,35 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.auth.sessions import sessions  # noqa: E402
-from app.auth.store import users  # noqa: E402
+from app.auth.store import UserStore, users  # noqa: E402
 from app.main import app  # noqa: E402
-from app.queue_store import queues  # noqa: E402
+from app.queue_store import QueueStore, queues  # noqa: E402
 from app.services import reset_services  # noqa: E402
 
 
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app)
+
+
+@pytest.fixture
+def queue_store(tmp_path) -> QueueStore:
+    """An empty queue store with its own database (no seeded queues or patients)."""
+    return QueueStore(tmp_path / "queues.sqlite3")
+
+
+@pytest.fixture
+def patient(queue_store):
+    """patient("a") creates (once) an account a@x.edu in queue_store's database and returns its user ID."""
+    accounts = UserStore(queue_store.database.path)
+    ids: dict[str, str] = {}
+
+    def make(name: str) -> str:
+        if name not in ids:
+            ids[name] = accounts.create(f"{name}@x.edu", "Queue$mart1", name).id
+        return ids[name]
+
+    return make
 
 
 @pytest.fixture(scope="session", autouse=True)

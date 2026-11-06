@@ -3,7 +3,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.queue_store import AlreadyQueuedError, QueueStore, queues
+from app.auth.store import users
+from app.queue_store import AlreadyQueuedError, queues
 
 
 def login(client, email="student@university.edu"):
@@ -16,44 +17,44 @@ def register(client, email):
     return {"Authorization": f"Bearer {response.json()['token']}"}
 
 
-def test_join_triggers_notification_and_close_alert_for_short_queue():
-    store = QueueStore()
-    entry = store.join("svc", "Clinic service", 10, "student", "student@x.edu")
-    items = store.notifications.for_user("student")
+def test_join_triggers_notification_and_close_alert_for_short_queue(queue_store, patient):
+    store = queue_store
+    entry = store.join("svc", "Clinic service", 10, patient("student"))
+    items = store.notifications.for_user(patient("student"))
     assert [item.kind for item in items] == ["almost-ready", "joined"]
     assert items[1].entry_id == entry.id
     assert items[1].ticket == entry.ticket
     assert "Clinic service" in items[1].message
     assert not any(item.read for item in items)
-    assert store.notifications.for_user("someone-else") == []
+    assert store.notifications.for_user(patient("someone-else")) == []
 
 
-def test_close_notification_when_serve_or_leave_moves_patient_to_position_two():
-    store = QueueStore()
+def test_close_notification_when_serve_or_leave_moves_patient_to_position_two(queue_store, patient):
+    store = queue_store
     for name in ("a", "b", "c", "d"):
-        store.join("svc", "Clinic", 10, name, f"{name}@x.edu")
-    assert [item.kind for item in store.notifications.for_user("c")] == ["joined"]
+        store.join("svc", "Clinic", 10, patient(name))
+    assert [item.kind for item in store.notifications.for_user(patient("c"))] == ["joined"]
     store.serve_next("svc")
-    assert store.notifications.for_user("c")[0].kind == "almost-ready"
-    store.leave("b")
-    assert store.notifications.for_user("d")[0].kind == "almost-ready"
+    assert store.notifications.for_user(patient("c"))[0].kind == "almost-ready"
+    store.leave(patient("b"))
+    assert store.notifications.for_user(patient("d"))[0].kind == "almost-ready"
     # Serving the next person doesn't repeat the position-2 alert at position 1.
     store.serve_next("svc")
-    assert sum(item.kind == "almost-ready" for item in store.notifications.for_user("d")) == 1
+    assert sum(item.kind == "almost-ready" for item in store.notifications.for_user(patient("d"))) == 1
 
 
-def test_priority_jump_to_front_triggers_close_alert_without_repeated_reads():
-    store = QueueStore()
+def test_priority_jump_to_front_triggers_close_alert_without_repeated_reads(queue_store, patient):
+    store = queue_store
     for name in ("a", "b", "c"):
-        entry = store.join("svc", "Clinic", 10, name, f"{name}@x.edu")
+        entry = store.join("svc", "Clinic", 10, patient(name))
     store.set_priority("svc", entry.id, "urgent")
-    assert store.notifications.for_user("c")[0].kind == "almost-ready"
-    before = store.notifications.for_user("c")
+    assert store.notifications.for_user(patient("c"))[0].kind == "almost-ready"
+    before = store.notifications.for_user(patient("c"))
     store.set_priority("svc", entry.id, "urgent")
-    assert store.notifications.for_user("c") == before
+    assert store.notifications.for_user(patient("c")) == before
     with pytest.raises(AlreadyQueuedError):
-        store.join("other", "Other", 5, "c", "c@x.edu")
-    assert store.notifications.for_user("c") == before
+        store.join("other", "Other", 5, patient("c"))
+    assert store.notifications.for_user(patient("c")) == before
 
 
 def test_notifications_remain_after_leaving_and_joining_again(client):
@@ -133,6 +134,7 @@ def test_notification_routes_require_authentication(client, method, path, body):
 
 
 def test_reset_removes_notifications_and_read_state():
-    queues.join("svc", "Clinic", 10, "student", "student@x.edu", datetime(2026, 10, 21, tzinfo=UTC))
+    student = users.get_by_email("student@university.edu").id
+    queues.join("svc", "Clinic", 10, student, datetime(2026, 10, 21, tzinfo=UTC))
     queues.reset()
-    assert queues.notifications.for_user("student") == []
+    assert queues.notifications.for_user(student) == []

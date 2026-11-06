@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.queue_store import AlreadyQueuedError, NotQueuedError, QueueStore, queues
+from app.queue_store import AlreadyQueuedError, NotQueuedError, queues
 
 
 def _login(client, email):
@@ -31,94 +31,92 @@ def _emails(client, headers, service_id="prescription-refill"):
 
 # --- Store: ordering ---------------------------------------------------------
 
-def test_line_follows_arrival_order():
-    store = QueueStore()
+def _names(entries):
+    return [entry.email.split("@")[0] for entry in entries]
+
+
+def test_line_follows_arrival_order(queue_store, patient):
     start = datetime(2026, 10, 20, 9, tzinfo=UTC)
     for minute, name in enumerate(["a", "b", "c"]):
-        store.join("svc", "Service", 10, name, f"{name}@x.edu", start + timedelta(minutes=minute))
+        queue_store.join("svc", "Service", 10, patient(name), start + timedelta(minutes=minute))
 
-    assert [entry.user_id for entry in store.waiting("svc")] == ["a", "b", "c"]
-    assert [entry.position for entry in store.waiting("svc")] == [1, 2, 3]
+    assert _names(queue_store.waiting("svc")) == ["a", "b", "c"]
+    assert [entry.position for entry in queue_store.waiting("svc")] == [1, 2, 3]
 
 
-def test_arrival_counter_breaks_ties_when_join_times_match():
-    store = QueueStore()
+def test_arrival_counter_breaks_ties_when_join_times_match(queue_store, patient):
     same_time = datetime(2026, 10, 20, 9, tzinfo=UTC)
     for name in ["a", "b", "c"]:
-        store.join("svc", "Service", 10, name, f"{name}@x.edu", same_time)
+        queue_store.join("svc", "Service", 10, patient(name), same_time)
 
-    assert [entry.user_id for entry in store.waiting("svc")] == ["a", "b", "c"]
+    assert _names(queue_store.waiting("svc")) == ["a", "b", "c"]
 
 
-def test_urgent_entries_go_first_then_arrival_order():
-    store = QueueStore()
-    entries = {name: store.join("svc", "Service", 10, name, f"{name}@x.edu") for name in ["a", "b", "c", "d"]}
+def test_urgent_entries_go_first_then_arrival_order(queue_store, patient):
+    entries = {name: queue_store.join("svc", "Service", 10, patient(name)) for name in ["a", "b", "c", "d"]}
 
-    store.set_priority("svc", entries["d"].id, "urgent")
-    store.set_priority("svc", entries["c"].id, "urgent")
+    queue_store.set_priority("svc", entries["d"].id, "urgent")
+    queue_store.set_priority("svc", entries["c"].id, "urgent")
 
     # c and d are both urgent, so c (who arrived first) stays ahead of d.
-    assert [entry.user_id for entry in store.waiting("svc")] == ["c", "d", "a", "b"]
-    store.set_priority("svc", entries["c"].id, "normal")
-    assert [entry.user_id for entry in store.waiting("svc")] == ["d", "a", "b", "c"]
+    assert _names(queue_store.waiting("svc")) == ["c", "d", "a", "b"]
+    queue_store.set_priority("svc", entries["c"].id, "normal")
+    assert _names(queue_store.waiting("svc")) == ["d", "a", "b", "c"]
 
 
-def test_serve_next_takes_the_front_and_moves_everyone_up():
-    store = QueueStore()
+def test_serve_next_takes_the_front_and_moves_everyone_up(queue_store, patient):
     for name in ["a", "b", "c"]:
-        store.join("svc", "Service", 10, name, f"{name}@x.edu")
+        queue_store.join("svc", "Service", 10, patient(name))
 
-    served = store.serve_next("svc")
+    served = queue_store.serve_next("svc")
 
-    assert served.user_id == "a" and served.status == "served" and served.position is None
-    assert [(entry.user_id, entry.position) for entry in store.waiting("svc")] == [("b", 1), ("c", 2)]
-
-
-def test_serve_next_on_empty_line_returns_none():
-    assert QueueStore().serve_next("svc") is None
+    assert served.user_id == patient("a") and served.status == "served" and served.position is None
+    assert [(entry.user_id, entry.position) for entry in queue_store.waiting("svc")] == [
+        (patient("b"), 1), (patient("c"), 2),
+    ]
 
 
-def test_queues_are_separate_per_service():
-    store = QueueStore()
-    store.join("one", "One", 10, "a", "a@x.edu")
-    store.join("two", "Two", 10, "b", "b@x.edu")
-
-    store.serve_next("one")
-
-    assert store.waiting_count("one") == 0
-    assert store.waiting_count("two") == 1
+def test_serve_next_on_empty_line_returns_none(queue_store):
+    assert queue_store.serve_next("svc") is None
 
 
-def test_store_rejects_second_active_entry_and_leaving_twice():
-    store = QueueStore()
-    store.join("svc", "Service", 10, "a", "a@x.edu")
+def test_queues_are_separate_per_service(queue_store, patient):
+    queue_store.join("one", "One", 10, patient("a"))
+    queue_store.join("two", "Two", 10, patient("b"))
+
+    queue_store.serve_next("one")
+
+    assert queue_store.waiting_count("one") == 0
+    assert queue_store.waiting_count("two") == 1
+
+
+def test_store_rejects_second_active_entry_and_leaving_twice(queue_store, patient):
+    queue_store.join("svc", "Service", 10, patient("a"))
 
     with pytest.raises(AlreadyQueuedError):
-        store.join("other", "Other", 10, "a", "a@x.edu")
-    store.leave("a")
+        queue_store.join("other", "Other", 10, patient("a"))
+    queue_store.leave(patient("a"))
     with pytest.raises(NotQueuedError):
-        store.leave("a")
+        queue_store.leave(patient("a"))
 
 
-def test_set_priority_rejects_unknown_or_finished_entries():
-    store = QueueStore()
-    entry = store.join("svc", "Service", 10, "a", "a@x.edu")
+def test_set_priority_rejects_unknown_or_finished_entries(queue_store, patient):
+    entry = queue_store.join("svc", "Service", 10, patient("a"))
 
     with pytest.raises(KeyError):
-        store.set_priority("other", entry.id, "urgent")
-    store.serve_next("svc")
+        queue_store.set_priority("other", entry.id, "urgent")
+    queue_store.serve_next("svc")
     with pytest.raises(KeyError):
-        store.set_priority("svc", entry.id, "urgent")
+        queue_store.set_priority("svc", entry.id, "urgent")
 
 
-def test_position_changes_are_announced():
-    store = QueueStore()
-    a, b, c = (store.join("svc", "Service", 10, name, f"{name}@x.edu") for name in ["a", "b", "c"])
-    d = store.join("svc", "Service", 10, "d", "d@x.edu")
+def test_position_changes_are_announced(queue_store, patient):
+    a, b, c, d = (queue_store.join("svc", "Service", 10, patient(name)).id for name in ["a", "b", "c", "d"])
 
-    store.set_priority("svc", d.id, "urgent")  # d jumps ahead; a, b, c move back
-    store.serve_next("svc")                    # d served; a, b, c move up again
+    queue_store.set_priority("svc", d, "urgent")  # d jumps ahead; a, b, c move back
+    queue_store.serve_next("svc")                 # d served; a, b, c move up again
 
+    a, b, c, d = (queue_store.get(entry_id) for entry_id in (a, b, c, d))
     assert [u.kind for u in a.updates] == ["joined", "delayed", "moved"]
     assert a.updates[1].message == "The queue order changed, so you moved back to position 2."
     assert [u.message for u in b.updates][-1] == "You're almost up. Head to the clinic now."

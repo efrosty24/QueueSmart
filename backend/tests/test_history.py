@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.history_store import HistoryStore
-from app.queue_store import NotQueuedError, QueueStore
+from app.queue_store import NotQueuedError
 
 
 def login(client, email="student@university.edu"):
@@ -11,49 +11,49 @@ def login(client, email="student@university.edu"):
     return {"Authorization": f"Bearer {response.json()['token']}"}
 
 
-def test_history_records_completion_and_actual_elapsed_wait_once():
-    store = QueueStore()
+def test_history_records_completion_and_actual_elapsed_wait_once(queue_store, patient):
+    store, user_id = queue_store, patient("p")
     start = datetime(2026, 10, 21, 9, tzinfo=UTC)
-    entry = store.join("svc", "Clinic visit", 20, "patient", "p@x.edu", start)
-    assert store.history.for_user("patient") == []
+    entry = store.join("svc", "Clinic visit", 20, user_id, start)
+    assert store.history.for_user(user_id) == []
     store.serve_next("svc", start + timedelta(minutes=7, seconds=30))
-    visits = store.history.for_user("patient")
+    visits = store.history.for_user(user_id)
     assert len(visits) == 1
     assert visits[0].id == entry.id and visits[0].outcome == "served"
     assert visits[0].waited_minutes == 7
     assert visits[0].finished_at == start + timedelta(minutes=7, seconds=30)
     assert store.serve_next("svc") is None
-    assert store.history.for_user("patient") == visits
+    assert store.history.for_user(user_id) == visits
 
 
-def test_left_history_survives_rejoin_and_is_ordered_by_completion():
-    store = QueueStore()
+def test_left_history_survives_rejoin_and_is_ordered_by_completion(queue_store, patient):
+    store, user_id = queue_store, patient("p")
     start = datetime(2026, 10, 21, 9, tzinfo=UTC)
-    first = store.join("one", "First service", 10, "patient", "p@x.edu", start)
-    store.leave("patient", start + timedelta(minutes=2))
+    first = store.join("one", "First service", 10, user_id, start)
+    store.leave(user_id, start + timedelta(minutes=2))
     with pytest.raises(NotQueuedError):
-        store.leave("patient")
-    second = store.join("two", "Second service", 5, "patient", "p@x.edu", start + timedelta(minutes=3))
+        store.leave(user_id)
+    second = store.join("two", "Second service", 5, user_id, start + timedelta(minutes=3))
     store.serve_next("two", start + timedelta(minutes=4))
-    visits = store.history.for_user("patient")
+    visits = store.history.for_user(user_id)
     assert [visit.id for visit in visits] == [second.id, first.id]
     assert [visit.outcome for visit in visits] == ["served", "left"]
-    assert store.history.for_user("other") == []
+    assert store.history.for_user(patient("other")) == []
 
 
-def test_service_deletion_records_every_waiting_patient():
-    store = QueueStore()
+def test_service_deletion_records_every_waiting_patient(queue_store, patient):
+    store = queue_store
     for name in ("a", "b", "c"):
-        store.join("deleted", "Deleted clinic service", 10, name, f"{name}@x.edu")
+        store.join("deleted", "Deleted clinic service", 10, patient(name))
     store.remove_service("deleted")
     store.remove_service("deleted")
     for name in ("a", "b", "c"):
-        visits = store.history.for_user(name)
+        visits = store.history.for_user(patient(name))
         assert len(visits) == 1
         assert visits[0].outcome == "left"
         assert visits[0].service_name == "Deleted clinic service"
     store.reset()
-    assert store.history.for_user("a") == []
+    assert store.history.for_user(patient("a")) == []
 
 
 def test_history_store_deduplicates_and_clamps_negative_elapsed_time():
