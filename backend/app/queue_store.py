@@ -1,17 +1,16 @@
 """Persistent queues and queue entries in SQLite (Assignment 4).
 
 Each service has one queue. Urgent entries go ahead of normal ones; within the same
-priority, whoever arrived first is served first. Notifications and history are still
-in memory; they are recorded only after the database change commits.
+priority, whoever arrived first is served first. Notifications and history commit
+in the same SQLite transaction as the queue change that produces them.
 """
 
 import sqlite3
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from functools import partial
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
@@ -89,9 +88,6 @@ _ENTRY_QUERY = """
 # Urgent before normal, then arrival order.
 _LINE_ORDER = "ORDER BY e.priority = 'normal', e.arrival"
 
-Effects = list[Callable[[], object]]
-
-
 def _time(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value is not None else None
 
@@ -123,8 +119,9 @@ class QueueStore:
         self.database = Database(path if path is not None else database_path())
         # FastAPI runs sync endpoints in a thread pool; BEGIN IMMEDIATE also guards other processes.
         self._lock = threading.Lock()
-        self.notifications = NotificationStore()
-        self.history = HistoryStore()
+        self.notifications = NotificationStore(self.database.path)
+        self.history = HistoryStore(self.database.path)
+        self._backfill_activity()
 
     # --- Reads ---------------------------------------------------------------
 
@@ -160,14 +157,14 @@ class QueueStore:
 
     def set_status(self, service_id: str, status: QueueStatus, now: datetime | None = None) -> None:
         """Opens or closes the service's queue, creating the queue if it has none yet."""
-        with self._write() as (connection, _):
+        with self._write() as connection:
             self._save_queue(connection, service_id, status, now or datetime.now(UTC), replace=True)
 
     def join(self, service_id: str, service_name: str, duration_minutes: int, user_id: str,
              now: datetime | None = None) -> QueueEntry:
         now = now or datetime.now(UTC)
         entry_id = str(uuid4())
-        with self._write() as (connection, effects):
+        with self._write() as connection:
             current = self._current(connection, user_id)
             if current and current.status == "waiting":
                 raise AlreadyQueuedError(current.id)
@@ -185,61 +182,62 @@ class QueueStore:
                  now.isoformat(), service_name, duration_minutes),
             )
             entry = self._get(connection, entry_id)
-            self._add_update(connection, effects, entry, "joined",
+            self._add_update(connection, entry, "joined",
                              f"You joined the {service_name} queue at position {position}.", now)
             if position <= ALMOST_READY_POSITION:
-                self._notify(effects, entry, "almost-ready", "You're almost up. Head to the clinic now.", now)
+                self._notify(connection, entry, "almost-ready", "You're almost up. Head to the clinic now.", now,
+                             event_key="joined-ready")
             return self._get(connection, entry_id)
 
     def leave(self, user_id: str, now: datetime | None = None) -> QueueEntry:
         now = now or datetime.now(UTC)
-        with self._write() as (connection, effects):
+        with self._write() as connection:
             entry = self._current(connection, user_id)
             if entry is None or entry.status != "waiting":
                 raise NotQueuedError(user_id)
-            self._finish(connection, effects, entry, "left", now)
-            self._reposition(connection, effects, entry.queue_id, now)
+            self._finish(connection, entry, "left", now)
+            self._reposition(connection, entry.queue_id, now)
             return self._get(connection, entry.id)
 
     def serve_next(self, service_id: str, now: datetime | None = None) -> QueueEntry | None:
         """Calls in the person at the front of the line. None if nobody is waiting."""
         now = now or datetime.now(UTC)
-        with self._write() as (connection, effects):
+        with self._write() as connection:
             line = self._line(connection, "q.service_id = ?", service_id)
             if not line:
                 return None
             entry = line[0]
-            self._finish(connection, effects, entry, "served", now)
-            self._add_update(connection, effects, entry, "served", "You have been served. Thanks for visiting!", now)
-            self._reposition(connection, effects, entry.queue_id, now)
+            self._finish(connection, entry, "served", now)
+            self._add_update(connection, entry, "served", "You have been served. Thanks for visiting!", now)
+            self._reposition(connection, entry.queue_id, now)
             return self._get(connection, entry.id)
 
     def set_priority(self, service_id: str, entry_id: str, priority: EntryPriority,
                      now: datetime | None = None) -> QueueEntry:
         """Raises KeyError unless the entry is waiting in this service's line."""
         now = now or datetime.now(UTC)
-        with self._write() as (connection, effects):
+        with self._write() as connection:
             entry = self._get(connection, entry_id)
             if entry is None or entry.service_id != service_id or entry.status != "waiting":
                 raise KeyError(entry_id)
             connection.execute("UPDATE QueueEntry SET priority = ? WHERE entry_id = ?", (priority, entry_id))
-            self._reposition(connection, effects, entry.queue_id, now)
+            self._reposition(connection, entry.queue_id, now)
             return self._get(connection, entry_id)
 
     def remove_service(self, service_id: str, now: datetime | None = None) -> None:
         """A deleted service can't serve anyone: everyone waiting leaves and its queue closes.
         The queue row stays so past entries keep their service."""
         now = now or datetime.now(UTC)
-        with self._write() as (connection, effects):
+        with self._write() as connection:
             for entry in self._line(connection, "q.service_id = ?", service_id):
-                self._finish(connection, effects, entry, "left", now)
+                self._finish(connection, entry, "left", now)
             connection.execute("UPDATE Queue SET status = 'closed' WHERE service_id = ?", (service_id,))
 
     def seed(self, now: datetime | None = None) -> None:
         """Adds missing seeded queues, plus demo patients on a database with no entries yet.
         Saved queues and entries are never overwritten."""
         now = now or datetime.now(UTC)
-        with self._write() as (connection, _):
+        with self._write() as connection:
             for service_id, status in _SEED_STATUSES.items():
                 self._save_queue(connection, service_id, status, now, replace=False)
             if connection.execute("SELECT 1 FROM QueueEntry LIMIT 1").fetchone():
@@ -256,7 +254,7 @@ class QueueStore:
 
     def reset(self) -> None:
         """Test helper: deletes every queue (cascading to entries), then seeds again."""
-        with self._write() as (connection, _):
+        with self._write() as connection:
             connection.execute("DELETE FROM Queue")
         self.notifications.reset()
         self.history.reset()
@@ -265,14 +263,11 @@ class QueueStore:
     # --- Helpers -------------------------------------------------------------
 
     @contextmanager
-    def _write(self) -> Iterator[tuple[sqlite3.Connection, Effects]]:
-        """One write transaction. Notifications and history are recorded once it commits."""
-        effects: Effects = []
+    def _write(self) -> Iterator[sqlite3.Connection]:
+        """Queue, update feed, notification and history writes succeed or roll back together."""
         with self._lock, self.database.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            yield connection, effects
-        for effect in effects:
-            effect()
+            yield connection
 
     def _get(self, connection: sqlite3.Connection, entry_id: str) -> QueueEntry | None:
         rows = connection.execute(f"{_ENTRY_QUERY} WHERE e.entry_id = ?", (entry_id,)).fetchall()
@@ -301,37 +296,40 @@ class QueueStore:
         )
         return connection.execute("SELECT queue_id FROM Queue WHERE service_id = ?", (service_id,)).fetchone()[0]
 
-    def _finish(self, connection: sqlite3.Connection, effects: Effects, entry: QueueEntry,
+    def _finish(self, connection: sqlite3.Connection, entry: QueueEntry,
                 status: Literal["served", "left"], now: datetime) -> None:
         connection.execute(
             "UPDATE QueueEntry SET status = ?, position = NULL, finished_at = ? WHERE entry_id = ?",
             (status, now.isoformat(), entry.id),
         )
-        effects.append(partial(
-            self.history.record, entry_id=entry.id, user_id=entry.user_id, ticket=entry.ticket,
+        self.history.record(
+            entry_id=entry.id, user_id=entry.user_id, ticket=entry.ticket,
             service_id=entry.service_id, service_name=entry.service_name,
-            joined_at=entry.joined_at, finished_at=now, outcome=status,
-        ))
-        if status == "left":
-            self._notify(effects, entry, "left", "You left the queue. Your visit is saved to History.", now)
-
-    def _notify(self, effects: Effects, entry: QueueEntry, kind: NotificationKind, message: str,
-                at: datetime) -> None:
-        effects.append(partial(
-            self.notifications.add, user_id=entry.user_id, entry_id=entry.id, ticket=entry.ticket,
-            service_id=entry.service_id, service_name=entry.service_name, kind=kind, message=message, at=at,
-        ))
-
-    def _add_update(self, connection: sqlite3.Connection, effects: Effects, entry: QueueEntry,
-                    kind: UpdateKind, message: str, at: datetime) -> None:
-        connection.execute(
-            "INSERT INTO QueueEntryUpdate (entry_id, update_id, kind, message, at) "
-            "SELECT ?, coalesce(max(update_id), 0) + 1, ?, ?, ? FROM QueueEntryUpdate WHERE entry_id = ?",
-            (entry.id, kind, message, at.isoformat(), entry.id),
+            joined_at=entry.joined_at, finished_at=now, outcome=status, connection=connection,
         )
-        self._notify(effects, entry, kind, message, at)
+        if status == "left":
+            self._notify(connection, entry, "left", "You left the queue. Your visit is saved to History.", now,
+                         event_key="left")
 
-    def _reposition(self, connection: sqlite3.Connection, effects: Effects, queue_id: str, now: datetime) -> None:
+    def _notify(self, connection: sqlite3.Connection, entry: QueueEntry, kind: NotificationKind, message: str,
+                at: datetime, *, event_key: str) -> None:
+        self.notifications.add(
+            user_id=entry.user_id, entry_id=entry.id, ticket=entry.ticket,
+            service_id=entry.service_id, service_name=entry.service_name, kind=kind, message=message, at=at,
+            event_key=event_key, connection=connection,
+        )
+
+    def _add_update(self, connection: sqlite3.Connection, entry: QueueEntry,
+                    kind: UpdateKind, message: str, at: datetime) -> int:
+        update_id = connection.execute(
+            "INSERT INTO QueueEntryUpdate (entry_id, update_id, kind, message, at) "
+            "SELECT ?, coalesce(max(update_id), 0) + 1, ?, ?, ? FROM QueueEntryUpdate WHERE entry_id = ? RETURNING update_id",
+            (entry.id, kind, message, at.isoformat(), entry.id),
+        ).fetchone()[0]
+        self._notify(connection, entry, kind, message, at, event_key=f"update:{update_id}")
+        return update_id
+
+    def _reposition(self, connection: sqlite3.Connection, queue_id: str, now: datetime) -> None:
         """Renumbers the line and tells everyone whose place changed."""
         for position, entry in enumerate(self._line(connection, "e.queue_id = ?", queue_id), start=1):
             previous = entry.position
@@ -339,17 +337,40 @@ class QueueStore:
                 continue
             connection.execute("UPDATE QueueEntry SET position = ? WHERE entry_id = ?", (position, entry.id))
             if position > previous:
-                self._add_update(connection, effects, entry, "delayed",
+                self._add_update(connection, entry, "delayed",
                                  f"The queue order changed, so you moved back to position {position}.", now)
             elif position == 1:
-                self._add_update(connection, effects, entry, "moved", "You're next in line.", now)
+                update_id = self._add_update(connection, entry, "moved", "You're next in line.", now)
                 if previous > ALMOST_READY_POSITION:
-                    self._notify(effects, entry, "almost-ready", "You're almost up. Head to the clinic now.", now)
+                    self._notify(connection, entry, "almost-ready", "You're almost up. Head to the clinic now.", now,
+                                 event_key=f"front-ready:{update_id}")
             elif position <= ALMOST_READY_POSITION:
-                self._add_update(connection, effects, entry, "almost-ready",
+                self._add_update(connection, entry, "almost-ready",
                                  "You're almost up. Head to the clinic now.", now)
             else:
-                self._add_update(connection, effects, entry, "moved", f"You moved up to position {position}.", now)
+                self._add_update(connection, entry, "moved", f"You moved up to position {position}.", now)
+
+    def _backfill_activity(self) -> None:
+        """Upgrade existing A4 queue data; event keys and entry IDs make this safe to repeat."""
+        with self._write() as connection:
+            entries = _load(connection, connection.execute(_ENTRY_QUERY).fetchall())
+            for entry in entries:
+                for update in entry.updates:
+                    self._notify(connection, entry, update.kind, update.message, update.at,
+                                 event_key=f"update:{update.id}")
+                    if update.kind == "joined" and update.message.endswith((" position 1.", " position 2.")):
+                        self._notify(connection, entry, "almost-ready", "You're almost up. Head to the clinic now.",
+                                     update.at, event_key="joined-ready")
+                if entry.status != "waiting":
+                    self.history.record(
+                        entry_id=entry.id, user_id=entry.user_id, ticket=entry.ticket,
+                        service_id=entry.service_id, service_name=entry.service_name,
+                        joined_at=entry.joined_at, finished_at=entry.finished_at,
+                        outcome=entry.status, connection=connection,
+                    )
+                    if entry.status == "left":
+                        self._notify(connection, entry, "left", "You left the queue. Your visit is saved to History.",
+                                     entry.finished_at, event_key="left")
 
 
 queues = QueueStore()

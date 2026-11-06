@@ -56,17 +56,19 @@ def test_service_deletion_records_every_waiting_patient(queue_store, patient):
     assert store.history.for_user(patient("a")) == []
 
 
-def test_history_store_deduplicates_and_clamps_negative_elapsed_time():
-    store = HistoryStore()
+def test_history_store_deduplicates_and_clamps_negative_elapsed_time(queue_store, patient):
+    store = HistoryStore(queue_store.database.path)
     now = datetime(2026, 10, 21, tzinfo=UTC)
-    fields = dict(entry_id="entry", user_id="patient", ticket="S-1", service_id="svc",
+    user_id = patient("p")
+    entry = queue_store.join("svc", "Clinic", 10, user_id, now)
+    fields = dict(entry_id=entry.id, user_id=user_id, ticket=entry.ticket, service_id="svc",
                   service_name="Clinic", joined_at=now, finished_at=now - timedelta(seconds=1))
     first = store.record(**fields, outcome="left")
     assert first.waited_minutes == 0
     assert store.record(**fields, outcome="served") == first
-    assert len(store.for_user("patient")) == 1
+    assert len(store.for_user(user_id)) == 1
     store.reset()
-    assert store.for_user("patient") == []
+    assert store.for_user(user_id) == []
 
 
 def test_history_api_tracks_visits_without_client_recording_and_survives_new_login(client):
