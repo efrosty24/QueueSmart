@@ -1,6 +1,6 @@
 """Queue management for A3 (Module 3): patients join and leave, admins view and serve.
 
-Ordering lives in queue_store: urgent before normal, then arrival order.
+Ordering and SQLite persistence live in queue_store: urgent before normal, then arrival order.
 """
 
 from datetime import datetime
@@ -107,7 +107,7 @@ def join_queue(service_id: str, user: CurrentUser) -> QueueEntryView:
     if service.status != "open":
         raise HTTPException(status.HTTP_409_CONFLICT, "This clinic queue is closed.")
     try:
-        entry = queues.join(service.id, service.name, service.expected_duration_minutes, user.id, user.email)
+        entry = queues.join(service.id, service.name, service.expected_duration_minutes, user.id)
     except AlreadyQueuedError:
         raise HTTPException(
             status.HTTP_409_CONFLICT, "You already have an active queue. Leave it before joining another service.",

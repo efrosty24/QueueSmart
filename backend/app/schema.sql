@@ -21,3 +21,50 @@ CREATE TABLE IF NOT EXISTS UserProfile (
     contact_info TEXT CHECK (contact_info IS NULL OR length(contact_info) <= 100),
     preferences TEXT CHECK (preferences IS NULL OR length(preferences) <= 1000)
 );
+
+-- Queue tables are STRICT, so SQLite rejects values of the wrong data type.
+-- Timestamps are ISO 8601 text; datetime() returns NULL for anything else.
+
+-- One queue per service. Its status is the service's open/closed availability.
+-- service_id has no foreign key yet: services are still kept in memory.
+CREATE TABLE IF NOT EXISTS Queue (
+    queue_id TEXT PRIMARY KEY NOT NULL CHECK (length(queue_id) = 36),
+    service_id TEXT NOT NULL UNIQUE CHECK (length(service_id) BETWEEN 1 AND 100),
+    status TEXT NOT NULL CHECK (status IN ('open', 'closed')),
+    created_at TEXT NOT NULL CHECK (datetime(created_at) IS NOT NULL)
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS QueueEntry (
+    entry_id TEXT PRIMARY KEY NOT NULL CHECK (length(entry_id) = 36),
+    queue_id TEXT NOT NULL REFERENCES Queue(queue_id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES UserCredentials(user_id) ON DELETE CASCADE,
+    -- Increasing join counter: arrival order, even when two join times match.
+    arrival INTEGER NOT NULL UNIQUE CHECK (arrival > 0),
+    ticket TEXT NOT NULL CHECK (length(ticket) BETWEEN 3 AND 20),
+    -- 1 is next in line. Only waiting entries have a position.
+    position INTEGER CHECK (position IS NULL OR position > 0),
+    joined_at TEXT NOT NULL CHECK (datetime(joined_at) IS NOT NULL),
+    -- Existing API name: left = canceled.
+    status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'served', 'left')),
+    priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'urgent')),
+    finished_at TEXT CHECK (finished_at IS NULL OR datetime(finished_at) IS NOT NULL),
+    -- Copied at join time so an entry keeps its name and duration if the service is deleted.
+    service_name TEXT NOT NULL CHECK (length(service_name) BETWEEN 1 AND 100),
+    duration_minutes INTEGER NOT NULL CHECK (duration_minutes BETWEEN 1 AND 480),
+    CHECK ((status = 'waiting') = (position IS NOT NULL)),
+    CHECK ((status = 'waiting') = (finished_at IS NULL))
+) STRICT;
+
+-- A user can wait in only one queue at a time.
+CREATE UNIQUE INDEX IF NOT EXISTS QueueEntry_one_waiting_per_user ON QueueEntry(user_id) WHERE status = 'waiting';
+CREATE INDEX IF NOT EXISTS QueueEntry_by_queue ON QueueEntry(queue_id, status);
+
+-- Position updates shown on the patient's queue page, numbered per entry.
+CREATE TABLE IF NOT EXISTS QueueEntryUpdate (
+    entry_id TEXT NOT NULL REFERENCES QueueEntry(entry_id) ON DELETE CASCADE,
+    update_id INTEGER NOT NULL CHECK (update_id > 0),
+    kind TEXT NOT NULL CHECK (kind IN ('joined', 'moved', 'delayed', 'almost-ready', 'served')),
+    message TEXT NOT NULL CHECK (length(message) BETWEEN 1 AND 200),
+    at TEXT NOT NULL CHECK (datetime(at) IS NOT NULL),
+    PRIMARY KEY (entry_id, update_id)
+) STRICT;

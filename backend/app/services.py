@@ -1,4 +1,5 @@
-"""Service management for A3. Records live in memory and reset on restart."""
+"""Service management for A3. Services live in memory and reset on restart; each service's
+open/closed status is its Queue row's status, saved in SQLite."""
 
 from typing import Annotated, Literal
 from uuid import uuid4
@@ -7,11 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, StringConstraints, computed_field
 
 from .auth.dependencies import get_current_user, require_admin
-from .queue_store import queues
+from .queue_store import QueueStatus, queues
 from .wait_time import estimate_wait
 
 Priority = Literal["low", "medium", "high"]
-QueueStatus = Literal["open", "closed"]
 
 
 class ServiceInput(BaseModel):
@@ -25,7 +25,11 @@ class ServiceInput(BaseModel):
 
 class Service(ServiceInput):
     id: str
-    status: QueueStatus = "closed"
+
+    @computed_field
+    @property
+    def status(self) -> QueueStatus:
+        return queues.status(self.id)
 
     @computed_field(alias="queueLength")
     @property
@@ -50,11 +54,11 @@ services: dict[str, Service] = {}
 def reset_services() -> None:
     seeds = [
         Service(id="sick-visit", name="Sick Visit", description="Meet with clinic staff about a new health concern.",
-                expectedDurationMinutes=12, priority="high", status="open"),
+                expectedDurationMinutes=12, priority="high"),
         Service(id="flu-shot", name="Flu Shot", description="Visit the campus clinic for your seasonal flu vaccination.",
-                expectedDurationMinutes=5, priority="low", status="open"),
+                expectedDurationMinutes=5, priority="low"),
         Service(id="prescription-refill", name="Prescription Refill", description="Talk with clinic staff about an existing prescription.",
-                expectedDurationMinutes=6, priority="medium", status="open"),
+                expectedDurationMinutes=6, priority="medium"),
         Service(id="lab-work", name="Lab Work", description="Sample collection and testing requested by your clinic provider.",
                 expectedDurationMinutes=10, priority="medium"),
     ]
@@ -82,6 +86,7 @@ def list_services() -> list[Service]:
 def create_service(body: ServiceInput) -> Service:
     service = Service(id=str(uuid4()), **body.model_dump(by_alias=True))
     services[service.id] = service
+    queues.set_status(service.id, "closed")
     return service
 
 
@@ -95,9 +100,9 @@ def update_service(service_id: str, body: ServiceInput) -> Service:
 
 @router.patch("/{service_id}/status", dependencies=[Depends(require_admin)])
 def set_service_status(service_id: str, body: StatusInput) -> Service:
-    updated = _get_service(service_id).model_copy(update={"status": body.status})
-    services[service_id] = updated
-    return updated
+    service = _get_service(service_id)
+    queues.set_status(service_id, body.status)
+    return service
 
 
 @router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])

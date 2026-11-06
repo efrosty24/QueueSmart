@@ -20,9 +20,9 @@ backend/
 │   ├── main.py          # FastAPI app, routers, CORS
 │   ├── errors.py        # 422 validation error format
 │   ├── database.py      # SQLite path, connections and transactions
-│   ├── schema.sql       # UserCredentials and UserProfile table definitions
-│   ├── services.py      # service routes, validation, in-memory records
-│   ├── queue_store.py   # in-memory queues: ordering, join/leave/serve, position updates
+│   ├── schema.sql       # UserCredentials, UserProfile, Queue and QueueEntry tables
+│   ├── services.py      # service routes, validation, in-memory records (status from Queue)
+│   ├── queue_store.py   # SQLite queues: ordering, join/leave/serve, position updates
 │   ├── queues.py        # /api/queues routes for patients and admins
 │   ├── wait_time.py     # reusable people-ahead × duration calculation
 │   ├── notifications.py # authenticated notification/read-state endpoints (Module 5)
@@ -68,9 +68,9 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 - Validation on both sides: email format (an allowlist that also blocks SQL-injection input), password rules (8–64 characters with an uppercase letter and a special character), and matching confirmation on sign-up. The server re-checks everything.
 - **Sessions:** signing in returns a token that lasts **7 days**. It's kept in the browser and re-checked with the server on every page load. **Sign out** revokes it on the server.
 - **Roles:** an account is an **admin** when the name part of its email (before the @) contains "admin"; everyone else is a patient. The role always comes from the server, and admin pages require it.
-- **Service management** (`/admin/services`): admins create, edit and delete services through the backend. The admin dashboard can open or close a service. The patient dashboard and join page load this same list, including new services. Services are kept in memory and reset when the backend restarts.
+- **Service management** (`/admin/services`): admins create, edit and delete services through the backend. The admin dashboard can open or close a service. The patient dashboard and join page load this same list, including new services. Services are kept in memory and reset when the backend restarts; each service's open/closed status is saved in SQLite.
 - **Wait estimates (Module 4):** the backend calculates each service's estimated wait and returns `estimatedWaitMinutes`. Service cards on the dashboard and join page display this response value.
-- **Queue management (Module 3):** patients join and leave a service's queue through the backend. Admins view each queue (`/admin/queue`), serve the next person, and can mark a patient urgent. Queues are ordered by priority (urgent first), then arrival order.
+- **Queue management (Module 3):** patients join and leave a service's queue through the backend. Admins view each queue (`/admin/queue`), serve the next person, and can mark a patient urgent. Queues are ordered by priority (urgent first), then arrival order. Queues and entries are saved in SQLite and survive backend restarts.
 - **Route guards:** signed-out users who open a signed-in page are sent to `/login`. Signed-in users who open `/login` or `/register` go to `/admin` or `/dashboard` depending on their role.
 - **Sidebar layout** for signed-in pages, with Dashboard, Queue status and History. Below 900px it becomes a slide-in menu. **Sign out** is a pill that turns red on hover and asks for confirmation in a popup.
 - **Dashboard** (`/dashboard`): current queue, available campus clinic services and estimated waits, recent in-app notifications, and the three most recent visits.
@@ -158,7 +158,7 @@ Then open http://localhost:8080 (not 5173). nginx serves the frontend and forwar
 
 ## Backend API
 
-Assignment 4's **UserCredentials** and **UserProfile** use SQLite. Sessions, services, queues, notifications and history still live in memory and reset when the server restarts. Sign in again after a backend restart; your account and profile remain saved. Run one backend process so the remaining in-memory stores are shared.
+Assignment 4's **UserCredentials**, **UserProfile**, **Queue** and **QueueEntry** use SQLite. Sessions, services, notifications and history still live in memory and reset when the server restarts. Sign in again after a backend restart; your account, profile and queue place remain saved. Run one backend process so the remaining in-memory stores are shared.
 
 ### SQLite setup and schema (Assignment 4)
 
@@ -166,9 +166,15 @@ Python's built-in `sqlite3` module handles the database; no database server or e
 
 The executable [SQL schema](backend/app/schema.sql) defines the primary keys, unique email constraint, required fields, length checks and foreign key. `UserCredentials.user_id` is a UUID; `UserProfile.email` is both its primary key and a foreign key to the unique credentials email, creating a one-to-one relationship. The database cascades email changes and account deletions to the profile. Existing API role names are retained: `patient` represents User and `admin` represents Administrator.
 
+**Queue** has one row per service: a UUID `queue_id`, a unique `service_id`, `status` (`open`/`closed`, the service's availability) and `created_at`. `service_id` has no foreign key yet because services are still kept in memory. Deleting a service closes its queue but keeps the row, so past entries keep their service.
+
+**QueueEntry** stores `queue_id` (foreign key to Queue), `user_id` (foreign key to UserCredentials), `position`, `joined_at` and `status` (`waiting`, `served` or `left`; the existing API name `left` represents canceled). It also keeps the ticket, arrival counter (unique, breaks ties between equal join times), priority, `finished_at`, and the service name and duration copied at join time. Check constraints require a position and no finish time exactly when an entry is waiting. A partial unique index allows only one waiting entry per user. The queue tables are `STRICT`, so SQLite rejects values of the wrong data type, and check constraints enforce length limits, allowed values and ISO 8601 timestamps. Deleting an account or queue cascades to its entries. **QueueEntryUpdate** stores each entry's numbered status-update feed.
+
+Queue changes run in `BEGIN IMMEDIATE` transactions, so concurrent joins get distinct positions and tickets. Notifications and history are recorded only after the change commits. On a new database, startup creates the four demo queues and six demo patients (`jordan.lee@university.edu` and others, password `Queue$mart1`); later starts never re-add them or overwrite saved statuses.
+
 Registration saves both records in one transaction. Passwords are stored as salted bcrypt hashes, never plaintext or reversible ciphertext. All queries bind user input as parameters. Startup inserts missing demo accounts without replacing saved account IDs, passwords or profile details. Docker Compose uses the `backend-data` volume so these records also survive container replacement.
 
-Tests always use a temporary database, separate from your saved local accounts. They cover constraints directly in SQLite, account isolation, duplicate registration (including concurrent attempts), rollback when profile creation fails, and login/profile retrieval from a new backend process. Run the test commands above for coverage; add `--cov-report=html` to generate the assignment's coverage report at `backend/htmlcov/index.html`.
+Tests always use a temporary database, separate from your saved local accounts. They cover constraints directly in SQLite, account isolation, duplicate registration (including concurrent attempts), rollback when profile creation fails, and login/profile retrieval from a new backend process. Queue tests cover Queue/QueueEntry constraints, cascades, persistence after reopening the database or starting a new backend process, concurrent joins, and rollback of failed queue changes. Run the test commands above for coverage; add `--cov-report=html` to generate the assignment's coverage report at `backend/htmlcov/index.html`.
 
 ### Demo accounts
 
