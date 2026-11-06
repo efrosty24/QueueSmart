@@ -26,9 +26,9 @@ backend/
 │   ├── queues.py        # /api/queues routes for patients and admins
 │   ├── wait_time.py     # reusable people-ahead × duration calculation
 │   ├── notifications.py # authenticated notification/read-state endpoints (Module 5)
-│   ├── notification_store.py # in-memory notifications triggered by queue changes
+│   ├── notification_store.py # SQLite notifications and sent/viewed state
 │   ├── history.py       # authenticated visit-history endpoint (Module 6)
-│   ├── history_store.py # in-memory completed/left visits
+│   ├── history_store.py # SQLite completed/left visits
 │   └── auth/            # Authentication module
 │       ├── router.py        # /api/auth endpoints
 │       ├── schemas.py       # request/response models
@@ -84,8 +84,8 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 Authentication, services, queues, notifications and history all use the backend (see [Backend API](#backend-api)). The old A2 history samples are no longer displayed.
 
 - **Queue state** comes from the backend. A queue only moves when an admin serves someone, someone leaves, or a patient is marked urgent. To try it, sign in as the student in one browser and as the admin in another (or a private window), then serve the student from `/admin/queue`.
-- **History:** the server records served and left visits, including when an admin deletes an occupied service. It retains the service name, ticket, timestamps, outcome and actual elapsed wait. Records remain after joining another queue, changing browsers or signing in again, until the backend restarts.
-- **Notifications:** the server records queue events, including joining and becoming close to being served (position 1 or 2). The feed remains available after leaving or joining another queue. Read/unread state is stored on the server. The UI checks notifications and history every 3 seconds and when the tab regains focus.
+- **History:** the server saves served and left visits in SQLite, including when an admin deletes an occupied service. It retains the service name, ticket, timestamps, outcome and actual elapsed wait. Records remain after joining another queue, changing browsers, signing in again or restarting the backend.
+- **Notifications:** the server saves queue events in SQLite, including joining and becoming close to being served (position 1 or 2). The feed remains available after leaving, joining another queue or restarting the backend. Sent/viewed state is stored in SQLite and exposed as the existing API's `read` boolean. The UI checks notifications and history every 3 seconds and when the tab regains focus.
 - Patient service lists reload when the page opens or the tab regains focus.
 
 ## Setup
@@ -158,7 +158,7 @@ Then open http://localhost:8080 (not 5173). nginx serves the frontend and forwar
 
 ## Backend API
 
-Assignment 4's **UserCredentials**, **UserProfile**, **Queue** and **QueueEntry** use SQLite. Sessions, services, notifications and history still live in memory and reset when the server restarts. Sign in again after a backend restart; your account, profile and queue place remain saved. Run one backend process so the remaining in-memory stores are shared.
+Assignment 4's **UserCredentials**, **UserProfile**, **Queue**, **QueueEntry**, **Notification** and **History** use SQLite. Sessions and service definitions still live in memory and reset when the server restarts. Sign in again after a backend restart; your account, profile, queue place, notifications, read status and history remain saved. Run one backend process so the remaining in-memory stores are shared.
 
 ### SQLite setup and schema (Assignment 4)
 
@@ -170,11 +170,17 @@ The executable [SQL schema](backend/app/schema.sql) defines the primary keys, un
 
 **QueueEntry** stores `queue_id` (foreign key to Queue), `user_id` (foreign key to UserCredentials), `position`, `joined_at` and `status` (`waiting`, `served` or `left`; the existing API name `left` represents canceled). It also keeps the ticket, arrival counter (unique, breaks ties between equal join times), priority, `finished_at`, and the service name and duration copied at join time. Check constraints require a position and no finish time exactly when an entry is waiting. A partial unique index allows only one waiting entry per user. The queue tables are `STRICT`, so SQLite rejects values of the wrong data type, and check constraints enforce length limits, allowed values and ISO 8601 timestamps. Deleting an account or queue cascades to its entries. **QueueEntryUpdate** stores each entry's numbered status-update feed.
 
-Queue changes run in `BEGIN IMMEDIATE` transactions, so concurrent joins get distinct positions and tickets. Notifications and history are recorded only after the change commits. On a new database, startup creates the four demo queues and six demo patients (`jordan.lee@university.edu` and others, password `Queue$mart1`); later starts never re-add them or overwrite saved statuses.
+**Notification** stores a generated `notification_id`, `user_id`, `entry_id`, event key, ticket, service snapshot, event kind, category, title, message, timestamp and `status` (`sent` or `viewed`). Here sent means available in the in-app feed; no email/SMS delivery is performed. `(entry_id, event_key)` is unique, preventing a repeated event or database upgrade from adding a duplicate or resetting viewed state. Messages allow 1–400 characters (including the service name), titles 1–100, event keys 1–100 and tickets 3–20. Service IDs and names allow up to 100 characters. Required fields, enum values and timestamps have SQL constraints, and `STRICT` rejects incompatible types.
+
+**History** stores one row per completed queue entry, with `entry_id` as its primary key, `user_id`, ticket, service snapshot, join/finish timestamps, outcome (`served` or `left`) and non-negative whole `waited_minutes`. The entry primary key prevents duplicate history. Both activity tables have a foreign key to UserCredentials and a composite foreign key `(entry_id, user_id)` to QueueEntry, ensuring the activity belongs to that entry's account. Account or physical queue/entry deletion cascades to the associated activity. Normal service deletion closes its queue and keeps completed entries, notifications and history. Service-name snapshots remain available even if a service is renamed or removed. Indexes support per-account retrieval.
+
+Queue changes run in `BEGIN IMMEDIATE` transactions, so concurrent joins get distinct positions and tickets. Queue entries, status updates, notifications and history now commit in the same transaction: failure in any write rolls everything back. The activity stores accept the existing connection during queue operations, avoiding a second writer connection. On a new database, startup creates the four demo queues and six demo patients (`jordan.lee@university.edu` and others, password `Queue$mart1`); later starts never re-add them or overwrite saved statuses.
+
+Existing database files are upgraded automatically with the new activity tables. Startup recovers completed history and recorded queue-update notifications from saved QueueEntry/QueueEntryUpdate data. Stable event keys make this safe to repeat and preserve read status. No database reset or manual data deletion is required. The notification/history endpoint shapes remain compatible with the A3 frontend, so the existing screens display persisted data without a separate UI rewrite.
 
 Registration saves both records in one transaction. Passwords are stored as salted bcrypt hashes, never plaintext or reversible ciphertext. All queries bind user input as parameters. Startup inserts missing demo accounts without replacing saved account IDs, passwords or profile details. Docker Compose uses the `backend-data` volume so these records also survive container replacement.
 
-Tests always use a temporary database, separate from your saved local accounts. They cover constraints directly in SQLite, account isolation, duplicate registration (including concurrent attempts), rollback when profile creation fails, and login/profile retrieval from a new backend process. Queue tests cover Queue/QueueEntry constraints, cascades, persistence after reopening the database or starting a new backend process, concurrent joins, and rollback of failed queue changes. Run the test commands above for coverage; add `--cov-report=html` to generate the assignment's coverage report at `backend/htmlcov/index.html`.
+Tests always use a temporary database, separate from your saved local accounts. They cover constraints directly in SQLite, account isolation, duplicate registration (including concurrent attempts), rollback when profile creation fails, and login/profile retrieval from a new backend process. Queue tests cover Queue/QueueEntry constraints, cascades, persistence after reopening the database or starting a new backend process, concurrent joins, and rollback of failed queue changes. Part 6 adds `test_activity_database.py` for notification/history SQL constraints, cross-account foreign keys, sent/viewed persistence, reopening and process restarts, existing-data upgrades, duplicate prevention, concurrent completion and atomic rollback of failed activity writes. Run the test commands above for coverage; add `--cov-report=html` to generate the assignment's coverage report at `backend/htmlcov/index.html`.
 
 ### Demo accounts
 
@@ -266,7 +272,7 @@ All requests require `Authorization: Bearer <token>`. Each account sees and chan
 | `PATCH` | `/api/notifications/{id}/read` | `{read: true}` or `{read: false}` | `200` updated notification |
 | `POST` | `/api/notifications/read-all` | — | `204`, all of your current notifications marked read |
 
-A notification contains `id`, `entryId`, `ticket`, `serviceId`, `serviceName`, `kind`, `category`, `title`, `message`, `at` and `read`. Kinds are `joined`, `moved`, `delayed`, `almost-ready`, `served` and `left`. Mutating a queue triggers notifications on the server; reading an endpoint never generates duplicate events. An immediate position of 1 or 2 on joining also triggers an `almost-ready` alert. Priority changes that move someone directly to the front trigger it too.
+A notification contains `id`, `entryId`, `ticket`, `serviceId`, `serviceName`, `kind`, `category`, `title`, `message`, `at` and `read`. Kinds are `joined`, `moved`, `delayed`, `almost-ready`, `served` and `left`. Mutating a queue saves notifications in SQLite; reading an endpoint never generates duplicate events. An immediate position of 1 or 2 on joining also triggers an `almost-ready` alert. Priority changes that move someone directly to the front trigger it too. The database keeps both the feed and read state across backend restarts.
 
 The read flag is a required JSON boolean; strings, numbers, nulls and extra fields return `422`. Notification IDs must be UUIDs; malformed/overlong IDs return `422`. Unknown IDs and another account's IDs both return `404`. Missing or invalid sessions return `401`.
 
@@ -276,7 +282,7 @@ The read flag is a required JSON boolean; strings, numbers, nulls and extra fiel
 
 Each record contains `id` (the queue entry ID), `ticket`, `serviceId`, `serviceName`, `joinedAt`, `finishedAt`, `outcome` (`served` or `left`), and `waitedMinutes` (elapsed whole minutes, rounded down, never negative). Service details are retained even after a service is renamed or deleted. Rejoining does not erase earlier visits. History is created by the backend queue operations even if the student has closed the browser; clients cannot submit fabricated completion records. Missing or invalid sessions return `401`.
 
-The Module 5/6 tests cover join and near-turn triggers, serving, leaving, priority changes, duplicate/failed operations, account isolation, read-state validation, history ordering and wait calculation, service deletion, and resetting the in-memory stores. Run the full suite with `pytest`; the existing 80% coverage requirement also applies to these modules. Backend tests are required for A3.
+The Module 5/6 tests cover join and near-turn triggers, serving, leaving, priority changes, duplicate/failed operations, account isolation, read-state validation, history ordering and wait calculation, service deletion, and isolated test resets. A4 persistence tests additionally verify both activity tables and saved read state across backend restarts. Run the full suite with `pytest`; the existing 80% coverage requirement also applies to these modules. Backend tests are required for A3/A4.
 
 ### Authentication rules
 

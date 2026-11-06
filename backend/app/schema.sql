@@ -1,4 +1,4 @@
--- Assignment 4: credentials and profiles. Enable foreign keys for manual use too.
+-- Assignment 4: SQLite schema. Enable foreign keys for manual use too.
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS UserCredentials (
@@ -68,3 +68,42 @@ CREATE TABLE IF NOT EXISTS QueueEntryUpdate (
     at TEXT NOT NULL CHECK (datetime(at) IS NOT NULL),
     PRIMARY KEY (entry_id, update_id)
 ) STRICT;
+
+-- Activity belongs to both a queue entry and its account. The composite key
+-- prevents storing another student's user_id on an entry's notification/history.
+CREATE UNIQUE INDEX IF NOT EXISTS QueueEntry_identity_user ON QueueEntry(entry_id, user_id);
+
+CREATE TABLE IF NOT EXISTS Notification (
+    notification_id TEXT PRIMARY KEY NOT NULL CHECK (length(notification_id) = 36),
+    user_id TEXT NOT NULL REFERENCES UserCredentials(user_id) ON DELETE CASCADE,
+    entry_id TEXT NOT NULL,
+    event_key TEXT NOT NULL CHECK (length(event_key) BETWEEN 1 AND 100),
+    ticket TEXT NOT NULL CHECK (length(ticket) BETWEEN 3 AND 20),
+    service_id TEXT NOT NULL CHECK (length(service_id) BETWEEN 1 AND 100),
+    service_name TEXT NOT NULL CHECK (length(trim(service_name)) BETWEEN 1 AND 100),
+    kind TEXT NOT NULL CHECK (kind IN ('joined', 'moved', 'delayed', 'almost-ready', 'served', 'left')),
+    category TEXT NOT NULL CHECK (category IN ('queue', 'status')),
+    title TEXT NOT NULL CHECK (length(trim(title)) BETWEEN 1 AND 100),
+    message TEXT NOT NULL CHECK (length(trim(message)) BETWEEN 1 AND 400),
+    at TEXT NOT NULL CHECK (datetime(at) IS NOT NULL),
+    -- "sent" means available in the in-app feed; no email or SMS is sent.
+    status TEXT NOT NULL DEFAULT 'sent' CHECK (status IN ('sent', 'viewed')),
+    UNIQUE (entry_id, event_key),
+    FOREIGN KEY (entry_id, user_id) REFERENCES QueueEntry(entry_id, user_id) ON DELETE CASCADE,
+    CHECK ((category = 'queue') = (kind IN ('moved', 'delayed')))
+) STRICT;
+CREATE INDEX IF NOT EXISTS Notification_by_user ON Notification(user_id, at DESC);
+
+CREATE TABLE IF NOT EXISTS History (
+    entry_id TEXT PRIMARY KEY NOT NULL,
+    user_id TEXT NOT NULL REFERENCES UserCredentials(user_id) ON DELETE CASCADE,
+    ticket TEXT NOT NULL CHECK (length(ticket) BETWEEN 3 AND 20),
+    service_id TEXT NOT NULL CHECK (length(service_id) BETWEEN 1 AND 100),
+    service_name TEXT NOT NULL CHECK (length(trim(service_name)) BETWEEN 1 AND 100),
+    joined_at TEXT NOT NULL CHECK (datetime(joined_at) IS NOT NULL),
+    finished_at TEXT NOT NULL CHECK (datetime(finished_at) IS NOT NULL),
+    outcome TEXT NOT NULL CHECK (outcome IN ('served', 'left')),
+    waited_minutes INTEGER NOT NULL CHECK (waited_minutes >= 0),
+    FOREIGN KEY (entry_id, user_id) REFERENCES QueueEntry(entry_id, user_id) ON DELETE CASCADE
+) STRICT;
+CREATE INDEX IF NOT EXISTS History_by_user ON History(user_id, finished_at DESC);
