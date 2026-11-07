@@ -13,7 +13,7 @@ from .auth.dependencies import CurrentUser, require_admin
 from .queue_store import (
     AlreadyQueuedError, EntryPriority, EntryStatus, NotQueuedError, QueueEntry, UpdateKind, queues,
 )
-from .services import services
+from .service_store import ServiceRecord
 from .wait_time import estimate_wait
 
 
@@ -62,7 +62,7 @@ router = APIRouter(prefix="/api/queues", tags=["queues"])
 
 def _view(entry: QueueEntry) -> QueueEntryView:
     # Use the service's current name and duration; fall back to the join-time copy if it was deleted.
-    service = services.get(entry.service_id)
+    service = queues.services.get(entry.service_id)
     duration = service.expected_duration_minutes if service else entry.duration_minutes
     people_ahead = entry.position - 1 if entry.position else 0
     return QueueEntryView(
@@ -79,9 +79,11 @@ def _line(service_id: str) -> list[QueueEntryView]:
     return [_view(entry) for entry in queues.waiting(service_id)]
 
 
-def _require_service(service_id: str) -> None:
-    if service_id not in services:
+def _require_service(service_id: str) -> ServiceRecord:
+    service = queues.services.get(service_id)
+    if service is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Service not found.")
+    return service
 
 
 @router.get("/me")
@@ -102,9 +104,8 @@ def leave_queue(user: CurrentUser) -> Response:
 
 @router.post("/{service_id}/join", status_code=status.HTTP_201_CREATED)
 def join_queue(service_id: str, user: CurrentUser) -> QueueEntryView:
-    _require_service(service_id)
-    service = services[service_id]
-    if service.status != "open":
+    service = _require_service(service_id)
+    if queues.status(service_id) != "open":
         raise HTTPException(status.HTTP_409_CONFLICT, "This clinic queue is closed.")
     try:
         entry = queues.join(service.id, service.name, service.expected_duration_minutes, user.id)

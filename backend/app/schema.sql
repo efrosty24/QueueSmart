@@ -25,11 +25,33 @@ CREATE TABLE IF NOT EXISTS UserProfile (
 -- Queue tables are STRICT, so SQLite rejects values of the wrong data type.
 -- Timestamps are ISO 8601 text; datetime() returns NULL for anything else.
 
+-- Services the clinic offers. Deleting a service archives it (sets deleted_at) instead
+-- of removing the row, so past queue entries, history and notifications keep their service.
+CREATE TABLE IF NOT EXISTS Service (
+    service_id TEXT PRIMARY KEY NOT NULL CHECK (length(service_id) BETWEEN 1 AND 100),
+    -- One line: no tabs or line breaks, and no runs of spaces (the API collapses them).
+    name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 100 AND name = trim(name)
+        AND instr(name, char(9)) = 0 AND instr(name, char(10)) = 0 AND instr(name, char(13)) = 0
+        AND instr(name, '  ') = 0),
+    description TEXT NOT NULL
+        CHECK (length(description) BETWEEN 1 AND 1000 AND description = trim(description)),
+    expected_duration_minutes INTEGER NOT NULL CHECK (expected_duration_minutes BETWEEN 1 AND 480),
+    priority TEXT NOT NULL CHECK (priority IN ('low', 'medium', 'high')),
+    created_at TEXT NOT NULL CHECK (datetime(created_at) IS NOT NULL),
+    updated_at TEXT NOT NULL CHECK (datetime(updated_at) IS NOT NULL),
+    deleted_at TEXT CHECK (deleted_at IS NULL OR datetime(deleted_at) IS NOT NULL)
+) STRICT;
+
+-- No two active services share a name (case-insensitive). Archived names can be reused.
+CREATE UNIQUE INDEX IF NOT EXISTS Service_active_name ON Service(name COLLATE NOCASE) WHERE deleted_at IS NULL;
+
 -- One queue per service. Its status is the service's open/closed availability.
--- service_id has no foreign key yet: services are still kept in memory.
+-- RESTRICT: a service with a queue can't be hard-deleted (it is archived instead), so
+-- queue entries, history and notifications never lose their service.
 CREATE TABLE IF NOT EXISTS Queue (
     queue_id TEXT PRIMARY KEY NOT NULL CHECK (length(queue_id) = 36),
-    service_id TEXT NOT NULL UNIQUE CHECK (length(service_id) BETWEEN 1 AND 100),
+    service_id TEXT NOT NULL UNIQUE REFERENCES Service(service_id) ON DELETE RESTRICT
+        CHECK (length(service_id) BETWEEN 1 AND 100),
     status TEXT NOT NULL CHECK (status IN ('open', 'closed')),
     created_at TEXT NOT NULL CHECK (datetime(created_at) IS NOT NULL)
 ) STRICT;

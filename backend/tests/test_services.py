@@ -1,6 +1,8 @@
 import pytest
 
 from app.queue_store import queues
+from app.service_store import ServiceStore
+from app.services import service_store
 
 
 VALID_SERVICE = {
@@ -167,3 +169,126 @@ def test_status_validation(client, admin_headers, body):
 
     assert response.status_code == 422
     assert client.get("/api/services", headers=admin_headers).json()[0]["status"] == "open"
+
+
+# ---------- Persistence (Service table) ----------
+
+
+def test_created_and_updated_services_are_saved_in_the_database(client, admin_headers):
+    created = client.post("/api/services", headers=admin_headers, json=VALID_SERVICE).json()
+    client.put(f"/api/services/{created['id']}", headers=admin_headers, json={**VALID_SERVICE, "priority": "high"})
+
+    # A new store on the same file stands in for a server restart.
+    saved = ServiceStore(service_store.database.path).get(created["id"])
+
+    assert (saved.name, saved.description, saved.expected_duration_minutes, saved.priority) == (
+        "Counseling", "Talk with a campus counselor.", 30, "high",
+    )
+
+
+def test_delete_archives_the_service_and_keeps_waiting_patients_history(client, admin_headers, patient_headers):
+    client.post("/api/queues/prescription-refill/join", headers=patient_headers)
+
+    assert client.delete("/api/services/prescription-refill", headers=admin_headers).status_code == 204
+
+    assert service_store.get("prescription-refill") is None
+    with service_store.database.connect() as connection:
+        row = connection.execute("SELECT deleted_at FROM Service WHERE service_id = 'prescription-refill'").fetchone()
+    assert row["deleted_at"] is not None
+    history = client.get("/api/history", headers=patient_headers).json()
+    assert [(visit["serviceName"], visit["outcome"]) for visit in history] == [("Prescription Refill", "left")]
+    # Archived services can't be changed, joined or deleted again.
+    for method, path, body in [
+        ("PUT", "/api/services/prescription-refill", VALID_SERVICE),
+        ("PATCH", "/api/services/prescription-refill/status", {"status": "open"}),
+        ("DELETE", "/api/services/prescription-refill", None),
+        ("POST", "/api/queues/prescription-refill/join", None),
+    ]:
+        assert client.request(method, path, headers=admin_headers, json=body).status_code == 404
+
+
+def test_deleted_service_name_can_be_used_again(client, admin_headers):
+    client.delete("/api/services/flu-shot", headers=admin_headers)
+
+    response = client.post("/api/services", headers=admin_headers, json={**VALID_SERVICE, "name": "Flu Shot"})
+
+    assert response.status_code == 201
+    assert response.json()["id"] != "flu-shot"
+
+
+# ---------- Unique service names ----------
+
+
+@pytest.mark.parametrize("name", ["Sick Visit", "sick visit", "  SICK VISIT  "])
+def test_create_with_existing_name_returns_409(client, admin_headers, name):
+    before = client.get("/api/services", headers=admin_headers).json()
+
+    response = client.post("/api/services", headers=admin_headers, json={**VALID_SERVICE, "name": name})
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "A service with this name already exists."
+    assert client.get("/api/services", headers=admin_headers).json() == before
+
+
+def test_update_to_another_services_name_returns_409(client, admin_headers):
+    response = client.put("/api/services/flu-shot", headers=admin_headers, json={**VALID_SERVICE, "name": "Lab Work"})
+
+    assert response.status_code == 409
+    assert service_store.get("flu-shot").name == "Flu Shot"
+
+
+def test_update_can_keep_its_own_name(client, admin_headers):
+    response = client.put("/api/services/flu-shot", headers=admin_headers, json={**VALID_SERVICE, "name": "flu shot"})
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "flu shot"
+
+
+def test_update_of_service_archived_mid_request_returns_404(client, admin_headers, monkeypatch):
+    monkeypatch.setattr(service_store, "update", lambda *args, **kwargs: None)
+
+    response = client.put("/api/services/flu-shot", headers=admin_headers, json=VALID_SERVICE)
+
+    assert response.status_code == 404
+
+
+# ---------- Server-side name and description rules ----------
+
+
+@pytest.mark.parametrize("name", ["Sick\nVisit", "Sick\tVisit", "Sick\rVisit", "Sick\x00Visit", "Sick\x7fVisit"])
+@pytest.mark.parametrize("method,path", [("POST", "/api/services"), ("PUT", "/api/services/flu-shot")])
+def test_names_must_be_one_line_without_hidden_characters(client, admin_headers, name, method, path):
+    before = client.get("/api/services", headers=admin_headers).json()
+
+    response = client.request(method, path, headers=admin_headers, json={**VALID_SERVICE, "name": name})
+
+    assert response.status_code == 422
+    assert response.json()["errors"] == {"name": "Use a single line without tabs, line breaks or hidden characters."}
+    assert client.get("/api/services", headers=admin_headers).json() == before
+
+
+def test_runs_of_spaces_in_names_collapse_before_saving(client, admin_headers):
+    response = client.post("/api/services", headers=admin_headers,
+                           json={**VALID_SERVICE, "name": "  Walk-in    Counseling  "})
+
+    assert response.status_code == 201
+    assert response.json()["name"] == "Walk-in Counseling"
+    assert service_store.get(response.json()["id"]).name == "Walk-in Counseling"
+
+
+def test_collapsed_name_still_counts_as_a_duplicate(client, admin_headers):
+    response = client.post("/api/services", headers=admin_headers, json={**VALID_SERVICE, "name": "Sick     Visit"})
+
+    assert response.status_code == 409
+
+
+def test_descriptions_keep_line_breaks_but_reject_hidden_characters(client, admin_headers):
+    multi_line = "First line.\nSecond line.\tIndented."
+    ok = client.post("/api/services", headers=admin_headers, json={**VALID_SERVICE, "description": multi_line})
+    bad = client.post("/api/services", headers=admin_headers,
+                      json={**VALID_SERVICE, "name": "Other", "description": "Bell\x07 character"})
+
+    assert ok.status_code == 201
+    assert ok.json()["description"] == multi_line
+    assert bad.status_code == 422
+    assert bad.json()["errors"] == {"description": "Remove hidden control characters."}

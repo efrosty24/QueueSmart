@@ -43,6 +43,7 @@ def test_left_history_survives_rejoin_and_is_ordered_by_completion(queue_store, 
 
 def test_service_deletion_records_every_waiting_patient(queue_store, patient):
     store = queue_store
+    store.services.create("Deleted clinic service", "Removed by staff.", 10, "low", service_id="deleted")
     for name in ("a", "b", "c"):
         store.join("deleted", "Deleted clinic service", 10, patient(name))
     store.remove_service("deleted")

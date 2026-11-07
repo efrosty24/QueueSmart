@@ -19,6 +19,7 @@ from .auth.store import SEED_PASSWORD, EmailTakenError, UserStore
 from .database import Database, database_path
 from .history_store import HistoryStore
 from .notification_store import NotificationKind, NotificationStore
+from .service_store import ServiceStore
 
 EntryPriority = Literal["normal", "urgent"]
 EntryStatus = Literal["waiting", "served", "left"]
@@ -69,7 +70,7 @@ class QueueEntry:
     updates: list[QueueUpdate] = field(default_factory=list)
 
 
-# Queue availability for the seeded services (see services.reset_services).
+# Queue availability for the seeded services (see service_store.SEED_SERVICES).
 _SEED_STATUSES: dict[str, QueueStatus] = {
     "sick-visit": "open", "flu-shot": "open", "prescription-refill": "open", "lab-work": "closed",
 }
@@ -117,6 +118,9 @@ def _load(connection: sqlite3.Connection, rows: list[sqlite3.Row]) -> list[Queue
 class QueueStore:
     def __init__(self, path: str | Path | None = None) -> None:
         self.database = Database(path if path is not None else database_path())
+        # Queues reference services; databases from before the Service table get the foreign key here.
+        self.services = ServiceStore(self.database.path)
+        self.services.upgrade_queue_table()
         # FastAPI runs sync endpoints in a thread pool; BEGIN IMMEDIATE also guards other processes.
         self._lock = threading.Lock()
         self.notifications = NotificationStore(self.database.path)
@@ -234,9 +238,10 @@ class QueueStore:
             connection.execute("UPDATE Queue SET status = 'closed' WHERE service_id = ?", (service_id,))
 
     def seed(self, now: datetime | None = None) -> None:
-        """Adds missing seeded queues, plus demo patients on a database with no entries yet.
-        Saved queues and entries are never overwritten."""
+        """Adds missing seeded services and queues, plus demo patients on a database with no
+        entries yet. Saved services, queues and entries are never overwritten."""
         now = now or datetime.now(UTC)
+        self.services.seed(now)
         with self._write() as connection:
             for service_id, status in _SEED_STATUSES.items():
                 self._save_queue(connection, service_id, status, now, replace=False)
