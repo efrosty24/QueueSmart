@@ -5,6 +5,7 @@ Service table. Its open/closed availability is its Queue row's status (queue_sto
 Deleting a service archives it so past queue activity still points at a real row.
 """
 
+import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -40,6 +41,9 @@ SEED_SERVICES: tuple[tuple[str, str, str, int, Priority], ...] = (
     ("prescription-refill", "Prescription Refill", "Talk with clinic staff about an existing prescription.", 6, "medium"),
     ("lab-work", "Lab Work", "Sample collection and testing requested by your clinic provider.", 10, "medium"),
 )
+
+# Archived stand-in for a queue whose service only existed in memory before A4 (see upgrade).
+_LEGACY_DESCRIPTION = "Service saved before services were stored in the database."
 
 _COLUMNS = "service_id, name, description, expected_duration_minutes, priority, created_at, updated_at"
 
@@ -118,6 +122,66 @@ class ServiceStore:
                 (now.isoformat(), now.isoformat(), service_id),
             ).rowcount
         return changed == 1
+
+    def reset(self) -> None:
+        """Test helper: deletes every queue (cascading to entries and activity) and service, then seeds."""
+        with self.database.connect() as connection:
+            connection.execute("DELETE FROM Queue")
+            connection.execute("DELETE FROM Service")
+        self.seed()
+
+    def upgrade_queue_table(self, now: datetime | None = None) -> bool:
+        """Adds the Queue.service_id -> Service foreign key to a database created before the
+        Service table existed. Returns True if an upgrade ran. Safe to call on any database.
+
+        SQLite can't add a foreign key to an existing table, so this follows SQLite's
+        documented rebuild: create the new table, copy rows, drop the old one, rename.
+        Every queue first gets a Service row: seeded services are added, and any other
+        queue gets an archived stand-in named from its most recent entry.
+        """
+        with self.database.connect() as connection:
+            table = connection.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'Queue'").fetchone()
+        if "REFERENCES Service" in table["sql"]:
+            return False
+
+        now = now or datetime.now(UTC)
+        self.seed(now)
+        with self.database.connect() as connection:
+            orphans = connection.execute("""
+                SELECT q.service_id,
+                       (SELECT e.service_name FROM QueueEntry e WHERE e.queue_id = q.queue_id
+                        ORDER BY e.arrival DESC LIMIT 1) AS name,
+                       (SELECT e.duration_minutes FROM QueueEntry e WHERE e.queue_id = q.queue_id
+                        ORDER BY e.arrival DESC LIMIT 1) AS duration
+                FROM Queue q
+                WHERE NOT EXISTS (SELECT 1 FROM Service s WHERE s.service_id = q.service_id)
+            """).fetchall()
+            connection.executemany(
+                f"INSERT INTO Service ({_COLUMNS}, deleted_at) VALUES (?, ?, ?, ?, 'medium', ?, ?, ?)",
+                [(row["service_id"], (row["name"] or row["service_id"]).strip()[:100] or row["service_id"],
+                  _LEGACY_DESCRIPTION, row["duration"] or 10, now.isoformat(), now.isoformat(), now.isoformat())
+                 for row in orphans],
+            )
+
+        schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
+        create_queue = re.search(r"CREATE TABLE IF NOT EXISTS Queue \(.*?\) STRICT;", schema, re.DOTALL).group(0)
+        # Foreign keys must be off while the table is swapped, and that can't change inside a transaction.
+        connection = sqlite3.connect(self.database.path, timeout=10, isolation_level=None)
+        try:
+            connection.execute("PRAGMA foreign_keys = OFF")
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(create_queue.replace("EXISTS Queue (", "EXISTS Queue_upgrade (", 1))
+            connection.execute("INSERT INTO Queue_upgrade SELECT queue_id, service_id, status, created_at FROM Queue")
+            connection.execute("DROP TABLE Queue")
+            connection.execute("ALTER TABLE Queue_upgrade RENAME TO Queue")
+            problems = connection.execute("PRAGMA foreign_key_check").fetchall()
+            if problems:
+                connection.execute("ROLLBACK")
+                raise sqlite3.IntegrityError(f"Queue upgrade would break foreign keys: {problems}")
+            connection.execute("COMMIT")
+        finally:
+            connection.close()
+        return True
 
     def seed(self, now: datetime | None = None) -> None:
         """Adds missing demo services. Saved services (including edited or archived seeds) are never overwritten."""

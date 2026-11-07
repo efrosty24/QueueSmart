@@ -18,6 +18,10 @@ from app.queue_store import QueueStore, queues  # noqa: E402
 from app.services import reset_services  # noqa: E402
 
 
+# Service IDs the queue_store fixture creates, so queues can reference them (Queue -> Service key).
+TEST_SERVICE_IDS = ("svc", "one", "two", "other")
+
+
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app)
@@ -25,8 +29,12 @@ def client() -> TestClient:
 
 @pytest.fixture
 def queue_store(tmp_path) -> QueueStore:
-    """An empty queue store with its own database (no seeded queues or patients)."""
-    return QueueStore(tmp_path / "queues.sqlite3")
+    """A queue store with its own database: no seeded queues or patients, only the test
+    services that queues must reference (svc, one, two, other)."""
+    store = QueueStore(tmp_path / "queues.sqlite3")
+    for service_id in TEST_SERVICE_IDS:
+        store.services.create(f"Test {service_id}", "Test service.", 10, "medium", service_id=service_id)
+    return store
 
 
 @pytest.fixture

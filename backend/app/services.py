@@ -1,17 +1,18 @@
-"""Service management for A3. Services live in memory and reset on restart; each service's
-open/closed status is its Queue row's status, saved in SQLite."""
+"""Service management (Module 2). Services are stored in the SQLite Service table
+(service_store); each service's open/closed status is its Queue row's status."""
 
-from typing import Annotated, Literal
-from uuid import uuid4
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, StringConstraints, computed_field
 
 from .auth.dependencies import get_current_user, require_admin
 from .queue_store import QueueStatus, queues
+from .service_store import DuplicateServiceNameError, Priority, ServiceRecord
 from .wait_time import estimate_wait
 
-Priority = Literal["low", "medium", "high"]
+# The same store the queues use, so services and queues share one database.
+service_store = queues.services
 
 
 class ServiceInput(BaseModel):
@@ -48,66 +49,74 @@ class StatusInput(BaseModel):
     status: QueueStatus
 
 
-services: dict[str, Service] = {}
+def _to_service(record: ServiceRecord) -> Service:
+    return Service(
+        id=record.id, name=record.name, description=record.description,
+        expectedDurationMinutes=record.expected_duration_minutes, priority=record.priority,
+    )
 
 
 def reset_services() -> None:
-    seeds = [
-        Service(id="sick-visit", name="Sick Visit", description="Meet with clinic staff about a new health concern.",
-                expectedDurationMinutes=12, priority="high"),
-        Service(id="flu-shot", name="Flu Shot", description="Visit the campus clinic for your seasonal flu vaccination.",
-                expectedDurationMinutes=5, priority="low"),
-        Service(id="prescription-refill", name="Prescription Refill", description="Talk with clinic staff about an existing prescription.",
-                expectedDurationMinutes=6, priority="medium"),
-        Service(id="lab-work", name="Lab Work", description="Sample collection and testing requested by your clinic provider.",
-                expectedDurationMinutes=10, priority="medium"),
-    ]
-    services.clear()
-    services.update({service.id: service for service in seeds})
+    """Test helper: back to just the seeded services (clears queues, which reference services)."""
+    service_store.reset()
 
 
-reset_services()
 router = APIRouter(prefix="/api/services", tags=["services"], dependencies=[Depends(get_current_user)])
 
 
-def _get_service(service_id: str) -> Service:
-    service = services.get(service_id)
+def _get_service(service_id: str) -> ServiceRecord:
+    service = service_store.get(service_id)
     if service is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Service not found.")
     return service
 
 
+def _duplicate_name() -> HTTPException:
+    return HTTPException(status.HTTP_409_CONFLICT, "A service with this name already exists.")
+
+
 @router.get("")
 def list_services() -> list[Service]:
-    return list(services.values())
+    return [_to_service(record) for record in service_store.list()]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
 def create_service(body: ServiceInput) -> Service:
-    service = Service(id=str(uuid4()), **body.model_dump(by_alias=True))
-    services[service.id] = service
-    queues.set_status(service.id, "closed")
-    return service
+    try:
+        record = service_store.create(body.name, body.description, body.expected_duration_minutes, body.priority)
+    except DuplicateServiceNameError:
+        raise _duplicate_name() from None
+    # New services start closed until an admin opens their queue.
+    queues.set_status(record.id, "closed")
+    return _to_service(record)
 
 
 @router.put("/{service_id}", dependencies=[Depends(require_admin)])
 def update_service(service_id: str, body: ServiceInput) -> Service:
-    current = _get_service(service_id)
-    updated = current.model_copy(update=body.model_dump())
-    services[service_id] = updated
-    return updated
+    _get_service(service_id)
+    try:
+        record = service_store.update(
+            service_id, body.name, body.description, body.expected_duration_minutes, body.priority,
+        )
+    except DuplicateServiceNameError:
+        raise _duplicate_name() from None
+    if record is None:  # archived by someone else in the meantime
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Service not found.")
+    return _to_service(record)
 
 
 @router.patch("/{service_id}/status", dependencies=[Depends(require_admin)])
 def set_service_status(service_id: str, body: StatusInput) -> Service:
-    service = _get_service(service_id)
+    record = _get_service(service_id)
     queues.set_status(service_id, body.status)
-    return service
+    return _to_service(record)
 
 
 @router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
 def delete_service(service_id: str) -> Response:
+    """Archives the service: it disappears from listings, its queue closes, and anyone
+    waiting leaves. The row stays so past queue entries and history keep their service."""
     _get_service(service_id)
-    del services[service_id]
+    service_store.archive(service_id)
     queues.remove_service(service_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

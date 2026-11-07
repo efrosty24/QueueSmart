@@ -43,10 +43,12 @@ CREATE TABLE IF NOT EXISTS Service (
 CREATE UNIQUE INDEX IF NOT EXISTS Service_active_name ON Service(name COLLATE NOCASE) WHERE deleted_at IS NULL;
 
 -- One queue per service. Its status is the service's open/closed availability.
--- service_id has no foreign key yet: services are still kept in memory.
+-- RESTRICT: a service with a queue can't be hard-deleted (it is archived instead), so
+-- queue entries, history and notifications never lose their service.
 CREATE TABLE IF NOT EXISTS Queue (
     queue_id TEXT PRIMARY KEY NOT NULL CHECK (length(queue_id) = 36),
-    service_id TEXT NOT NULL UNIQUE CHECK (length(service_id) BETWEEN 1 AND 100),
+    service_id TEXT NOT NULL UNIQUE REFERENCES Service(service_id) ON DELETE RESTRICT
+        CHECK (length(service_id) BETWEEN 1 AND 100),
     status TEXT NOT NULL CHECK (status IN ('open', 'closed')),
     created_at TEXT NOT NULL CHECK (datetime(created_at) IS NOT NULL)
 ) STRICT;

@@ -135,6 +135,6 @@ def test_notification_routes_require_authentication(client, method, path, body):
 
 def test_reset_removes_notifications_and_read_state():
     student = users.get_by_email("student@university.edu").id
-    queues.join("svc", "Clinic", 10, student, datetime(2026, 10, 21, tzinfo=UTC))
+    queues.join("prescription-refill", "Prescription Refill", 6, student, datetime(2026, 10, 21, tzinfo=UTC))
     queues.reset()
     assert queues.notifications.for_user(student) == []
