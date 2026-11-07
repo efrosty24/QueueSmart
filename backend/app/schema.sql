@@ -25,6 +25,23 @@ CREATE TABLE IF NOT EXISTS UserProfile (
 -- Queue tables are STRICT, so SQLite rejects values of the wrong data type.
 -- Timestamps are ISO 8601 text; datetime() returns NULL for anything else.
 
+-- Services the clinic offers. Deleting a service archives it (sets deleted_at) instead
+-- of removing the row, so past queue entries, history and notifications keep their service.
+CREATE TABLE IF NOT EXISTS Service (
+    service_id TEXT PRIMARY KEY NOT NULL CHECK (length(service_id) BETWEEN 1 AND 100),
+    name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 100 AND name = trim(name)),
+    description TEXT NOT NULL
+        CHECK (length(description) BETWEEN 1 AND 1000 AND description = trim(description)),
+    expected_duration_minutes INTEGER NOT NULL CHECK (expected_duration_minutes BETWEEN 1 AND 480),
+    priority TEXT NOT NULL CHECK (priority IN ('low', 'medium', 'high')),
+    created_at TEXT NOT NULL CHECK (datetime(created_at) IS NOT NULL),
+    updated_at TEXT NOT NULL CHECK (datetime(updated_at) IS NOT NULL),
+    deleted_at TEXT CHECK (deleted_at IS NULL OR datetime(deleted_at) IS NOT NULL)
+) STRICT;
+
+-- No two active services share a name (case-insensitive). Archived names can be reused.
+CREATE UNIQUE INDEX IF NOT EXISTS Service_active_name ON Service(name COLLATE NOCASE) WHERE deleted_at IS NULL;
+
 -- One queue per service. Its status is the service's open/closed availability.
 -- service_id has no foreign key yet: services are still kept in memory.
 CREATE TABLE IF NOT EXISTS Queue (
