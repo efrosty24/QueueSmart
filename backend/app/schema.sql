@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS UserProfile (
 -- of removing the row, so past queue entries, history and notifications keep their service.
 CREATE TABLE IF NOT EXISTS Service (
     service_id TEXT PRIMARY KEY NOT NULL CHECK (length(service_id) BETWEEN 1 AND 100),
-    name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 100 AND name = trim(name)),
+    -- One line: no tabs or line breaks, and no runs of spaces (the API collapses them).
+    name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 100 AND name = trim(name)
+        AND instr(name, char(9)) = 0 AND instr(name, char(10)) = 0 AND instr(name, char(13)) = 0
+        AND instr(name, '  ') = 0),
     description TEXT NOT NULL
         CHECK (length(description) BETWEEN 1 AND 1000 AND description = trim(description)),
     expected_duration_minutes INTEGER NOT NULL CHECK (expected_duration_minutes BETWEEN 1 AND 480),

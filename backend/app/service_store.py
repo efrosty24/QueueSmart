@@ -158,7 +158,7 @@ class ServiceStore:
             """).fetchall()
             connection.executemany(
                 f"INSERT INTO Service ({_COLUMNS}, deleted_at) VALUES (?, ?, ?, ?, 'medium', ?, ?, ?)",
-                [(row["service_id"], (row["name"] or row["service_id"]).strip()[:100] or row["service_id"],
+                [(row["service_id"], " ".join((row["name"] or "").split())[:100].strip() or row["service_id"],
                   _LEGACY_DESCRIPTION, row["duration"] or 10, now.isoformat(), now.isoformat(), now.isoformat())
                  for row in orphans],
             )

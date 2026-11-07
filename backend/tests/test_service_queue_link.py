@@ -116,7 +116,8 @@ def test_upgrade_adds_foreign_key_and_keeps_every_row(legacy_path):
     custom_queue = _add_queue(legacy_path, "made-in-memory", "closed")
     empty_queue = _add_queue(legacy_path, "never-used")
     _add_entry(legacy_path, seeded_queue, first, 1, "Sick Visit", 12)
-    _add_entry(legacy_path, custom_queue, second, 2, "  Old Counseling  ", 25)
+    # Names saved before A4 could have stray whitespace; the Service table doesn't allow it.
+    _add_entry(legacy_path, custom_queue, second, 2, "  Old\n Counseling  ", 25)
     assert "REFERENCES Service" not in _queue_sql(legacy_path)
 
     store = QueueStore(legacy_path)

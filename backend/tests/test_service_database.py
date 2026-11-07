@@ -152,6 +152,7 @@ def test_seed_is_repeatable_and_keeps_saved_changes(store):
 @pytest.mark.parametrize(("column", "value"), [
     ("service_id", None), ("service_id", ""), ("service_id", "x" * 101),
     ("name", None), ("name", ""), ("name", " padded "), ("name", "x" * 101),
+    ("name", "Two\nlines"), ("name", "Tab\there"), ("name", "Carriage\rreturn"), ("name", "Double  space"),
     # STRICT: a BLOB can never be stored as TEXT. (Numbers are converted to text by SQLite,
     # so the API's StrictStr is what rejects a numeric name.)
     ("name", b"bytes"),

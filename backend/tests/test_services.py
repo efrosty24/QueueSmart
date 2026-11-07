@@ -250,3 +250,45 @@ def test_update_of_service_archived_mid_request_returns_404(client, admin_header
     response = client.put("/api/services/flu-shot", headers=admin_headers, json=VALID_SERVICE)
 
     assert response.status_code == 404
+
+
+# ---------- Server-side name and description rules ----------
+
+
+@pytest.mark.parametrize("name", ["Sick\nVisit", "Sick\tVisit", "Sick\rVisit", "Sick\x00Visit", "Sick\x7fVisit"])
+@pytest.mark.parametrize("method,path", [("POST", "/api/services"), ("PUT", "/api/services/flu-shot")])
+def test_names_must_be_one_line_without_hidden_characters(client, admin_headers, name, method, path):
+    before = client.get("/api/services", headers=admin_headers).json()
+
+    response = client.request(method, path, headers=admin_headers, json={**VALID_SERVICE, "name": name})
+
+    assert response.status_code == 422
+    assert response.json()["errors"] == {"name": "Use a single line without tabs, line breaks or hidden characters."}
+    assert client.get("/api/services", headers=admin_headers).json() == before
+
+
+def test_runs_of_spaces_in_names_collapse_before_saving(client, admin_headers):
+    response = client.post("/api/services", headers=admin_headers,
+                           json={**VALID_SERVICE, "name": "  Walk-in    Counseling  "})
+
+    assert response.status_code == 201
+    assert response.json()["name"] == "Walk-in Counseling"
+    assert service_store.get(response.json()["id"]).name == "Walk-in Counseling"
+
+
+def test_collapsed_name_still_counts_as_a_duplicate(client, admin_headers):
+    response = client.post("/api/services", headers=admin_headers, json={**VALID_SERVICE, "name": "Sick     Visit"})
+
+    assert response.status_code == 409
+
+
+def test_descriptions_keep_line_breaks_but_reject_hidden_characters(client, admin_headers):
+    multi_line = "First line.\nSecond line.\tIndented."
+    ok = client.post("/api/services", headers=admin_headers, json={**VALID_SERVICE, "description": multi_line})
+    bad = client.post("/api/services", headers=admin_headers,
+                      json={**VALID_SERVICE, "name": "Other", "description": "Bell\x07 character"})
+
+    assert ok.status_code == 201
+    assert ok.json()["description"] == multi_line
+    assert bad.status_code == 422
+    assert bad.json()["errors"] == {"description": "Remove hidden control characters."}

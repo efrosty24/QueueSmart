@@ -1,10 +1,11 @@
 """Service management (Module 2). Services are stored in the SQLite Service table
 (service_store); each service's open/closed status is its Queue row's status."""
 
+import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, StringConstraints, computed_field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictInt, StrictStr, StringConstraints, computed_field
 
 from .auth.dependencies import get_current_user, require_admin
 from .queue_store import QueueStatus, queues
@@ -15,11 +16,32 @@ from .wait_time import estimate_wait
 service_store = queues.services
 
 
+# Control characters (tab, line breaks, NUL, ...). Descriptions may keep tabs and line breaks.
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+_HIDDEN_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _clean_name(name: str) -> str:
+    """Names are one line and appear on tickets and notifications. Runs of spaces collapse
+    to one, so "Sick   Visit" can't sidestep the unique-name rule."""
+    if _CONTROL.search(name):
+        raise ValueError("Use a single line without tabs, line breaks or hidden characters.")
+    return " ".join(name.split())
+
+
+def _clean_description(description: str) -> str:
+    if _HIDDEN_CONTROL.search(description):
+        raise ValueError("Remove hidden control characters.")
+    return description
+
+
 class ServiceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: Annotated[StrictStr, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
-    description: Annotated[StrictStr, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+    name: Annotated[StrictStr, StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+                    AfterValidator(_clean_name)]
+    description: Annotated[StrictStr, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000),
+                           AfterValidator(_clean_description)]
     expected_duration_minutes: Annotated[StrictInt, Field(alias="expectedDurationMinutes", ge=1, le=480)]
     priority: Priority
 
