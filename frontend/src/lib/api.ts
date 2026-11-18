@@ -44,6 +44,34 @@ export async function apiRequest<T>(path: string, { method = 'GET', body, token 
   return data as T
 }
 
+// Downloads a file from an endpoint that needs the session token (so a plain link won't do)
+// and saves it under the name the server suggests.
+export async function apiDownload(path: string, token: string | null, fallbackName: string): Promise<void> {
+  let response: Response
+  try {
+    response = await fetch(`/api${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  } catch {
+    throw new ApiError(0, "Can't reach the QueueSmart server. Check that the backend is running.")
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => null)
+    const detail = typeof data?.detail === 'string' ? data.detail : 'Something went wrong. Please try again.'
+    throw new ApiError(response.status, detail, data?.errors ?? {})
+  }
+
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const name = /filename="([^"]+)"/.exec(disposition)?.[1] ?? fallbackName
+  const url = URL.createObjectURL(await response.blob())
+  const link = document.createElement('a')
+  link.href = url
+  link.download = name
+  document.body.append(link)
+  link.click()
+  link.remove()
+  // Give the browser a moment to start the download before freeing the file.
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 // One line to show the user: field messages for validation errors, otherwise the server's detail.
 export function errorMessage(error: unknown, fallback: string) {
   if (!(error instanceof ApiError)) return fallback

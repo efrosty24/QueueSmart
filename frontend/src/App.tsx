@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { AppShell } from './components/AppShell'
 import { AdminDashboardPage } from './features/admin/AdminDashboardPage'
 import { QueueManagementPage } from './features/admin/QueueManagementPage'
+import { ReportsPage } from './features/admin/ReportsPage'
 import { ServiceManagementPage } from './features/admin/ServiceManagementPage'
 import { AuthProvider, useAuth } from './features/auth/AuthProvider'
 import { LoginPage } from './features/auth/LoginPage'
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="/admin/services" element={<ServiceManagementPage />} />
               <Route path="/admin/queue" element={<QueueManagementPage />} />
               <Route path="/admin/queue/:serviceId" element={<QueueManagementPage />} />
+              <Route path="/admin/reports" element={<ReportsPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

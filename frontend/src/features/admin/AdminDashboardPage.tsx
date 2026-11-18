@@ -64,6 +64,9 @@ export function AdminDashboardPage() {
             <Link to="/admin/services" className="btn btn-ghost">
               Manage services
             </Link>
+            <Link to="/admin/reports" className="btn btn-ghost">
+              Reports
+            </Link>
             <button type="button" className="btn btn-ghost" onClick={handleSignOut}>
               Sign out
             </button>
