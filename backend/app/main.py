@@ -7,6 +7,7 @@ from .queues import router as queues_router
 from .services import router as services_router
 from .notifications import router as notifications_router
 from .history import router as history_router
+from .reports import router as reports_router
 
 app = FastAPI(title="QueueSmart API", version="0.1.0")
 
@@ -24,6 +25,7 @@ app.include_router(services_router)
 app.include_router(queues_router)
 app.include_router(notifications_router)
 app.include_router(history_router)
+app.include_router(reports_router)
 
 
 @app.get("/api/health")

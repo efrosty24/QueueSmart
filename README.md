@@ -30,6 +30,10 @@ backend/
 │   ├── notification_store.py # SQLite notifications and sent/viewed state
 │   ├── history.py       # authenticated visit-history endpoint (Module 6)
 │   ├── history_store.py # SQLite completed/left visits
+│   ├── reports.py       # admin-only /api/reports routes: JSON report + CSV/PDF export
+│   ├── report_store.py  # report queries and statistics over History, Service, Queue and profiles
+│   ├── report_export.py # CSV (csv module) and PDF (ReportLab) report files
+│   ├── demo_activity.py # optional: python -m app.demo_activity adds past visits for report demos
 │   └── auth/            # Authentication module
 │       ├── router.py        # /api/auth endpoints
 │       ├── schemas.py       # request/response models
@@ -52,6 +56,7 @@ frontend/src/
 ├── mocks/           # legacy A2 samples; history and notifications now use the API
 └── features/
     ├── auth/        # login, registration, validation, session, route guards (calls the backend)
+    ├── admin/       # admin dashboard, service and queue management, reports
     ├── services/    # shared service API calls and patient service loading
     ├── dashboard/   # overview: current queue + recent visits
     ├── join/        # service selection, wait estimates, join/leave controls
@@ -72,6 +77,7 @@ Styling follows the shared theme. **Read [frontend/THEMING.md](frontend/THEMING.
 - **Service management** (`/admin/services`): admins create, edit and delete services through the backend. The admin dashboard can open or close a service. The patient dashboard and join page load this same list, including new services. Services are saved in SQLite and survive restarts; each service's open/closed status is its queue's status. Deleting a service archives it rather than erasing it, so patients' past visits keep their service.
 - **Wait estimates (Module 4):** the backend calculates each service's estimated wait and returns `estimatedWaitMinutes`. Service cards on the dashboard and join page display this response value.
 - **Queue management (Module 3):** patients join and leave a service's queue through the backend. Admins view each queue (`/admin/queue`), serve the next person, and can mark a patient urgent. Queues are ordered by priority (urgent first), then arrival order. Queues and entries are saved in SQLite and survive backend restarts.
+- **Reports** (`/admin/reports`, admins only): queue usage statistics (visits, patients served, served rate, average and longest wait, busiest hour, waiting now), each service's details and activity, and each patient's queue participation history. Filter by date range and service, then download the same report as **CSV** or **PDF**. See [Report endpoints](#report-endpoints-final-project).
 - **Route guards:** signed-out users who open a signed-in page are sent to `/login`. Signed-in users who open `/login` or `/register` go to `/admin` or `/dashboard` depending on their role.
 - **Sidebar layout** for signed-in pages, with Dashboard, Queue status and History. Below 900px it becomes a slide-in menu. **Sign out** is a pill that turns red on hover and asks for confirmation in a popup.
 - **Dashboard** (`/dashboard`): current queue, available campus clinic services and estimated waits, recent in-app notifications, and the three most recent visits.
@@ -288,6 +294,28 @@ The read flag is a required JSON boolean; strings, numbers, nulls and extra fiel
 Each record contains `id` (the queue entry ID), `ticket`, `serviceId`, `serviceName`, `joinedAt`, `finishedAt`, `outcome` (`served` or `left`), and `waitedMinutes` (elapsed whole minutes, rounded down, never negative). Service details are retained even after a service is renamed or deleted. Rejoining does not erase earlier visits. History is created by the backend queue operations even if the student has closed the browser; clients cannot submit fabricated completion records. Missing or invalid sessions return `401`.
 
 The Module 5/6 tests cover join and near-turn triggers, serving, leaving, priority changes, duplicate/failed operations, account isolation, read-state validation, history ordering and wait calculation, service deletion, and isolated test resets. A4 persistence tests additionally verify both activity tables and saved read state across backend restarts. Run the full suite with `pytest`; the existing 80% coverage requirement also applies to these modules. Backend tests are required for A3/A4.
+
+### Report endpoints (Final project)
+
+Both endpoints require an **admin** session (`401` without one, `403` for patients) and take the same optional query filters:
+
+| Parameter | Meaning |
+| --- | --- |
+| `start`, `end` | Inclusive dates (`YYYY-MM-DD`). Visits count on the local day the patient **joined** the queue. `start` after `end` returns `422`. |
+| `serviceId` | Limit the report to one service (archived services work too). Unknown IDs return `404`. |
+| `tzOffset` | The browser's `Date.getTimezoneOffset()` in minutes (−840 to 840), so date filters and times match the admin's clock. Defaults to UTC. |
+
+- `GET /api/reports` returns JSON for the reports page: `summary` (`totalVisits`, `served`, `left`, `uniquePatients`, `averageWaitMinutes`, `longestWaitMinutes`, `servedRate`, `waitingNow`, `busiestHour`), `services` (details, open/closed/archived status, people waiting now and visit statistics), `patients` (name, email, visit counts, average wait, first/last visit, services used) and `visits` (every finished visit, newest first).
+- `GET /api/reports/export?format=csv|pdf` downloads the same report. The CSV holds four stacked sections (Summary, Services, Patients, Visits) and opens in Excel; cells that start with `=`, `+`, `-` or `@` are prefixed with `'` so patient-entered names can't run as spreadsheet formulas. The PDF (ReportLab) has the same sections as tables with page numbers. Downloads are sent with `Cache-Control: no-store`.
+
+Wait statistics count **served** visits only, because patients who left never finished waiting. Reports read the History table, so they include visits from services that were later deleted.
+
+**Demo data:** a new database has patients waiting but no finished visits yet. To fill reports for a demo, add two weeks of past weekday visits from 12 demo patients (it does nothing if visits are already saved; `--force` adds more):
+
+```bash
+cd backend
+.venv/Scripts/python -m app.demo_activity   # macOS/Linux: .venv/bin/python -m app.demo_activity
+```
 
 ### Authentication rules
 
