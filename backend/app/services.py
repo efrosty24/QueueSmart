@@ -10,7 +10,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictInt, St
 from .auth.dependencies import get_current_user, require_admin
 from .queue_store import QueueStatus, queues
 from .service_store import DuplicateServiceNameError, Priority, ServiceRecord
-from .wait_time import estimate_wait
+from .wait_time import estimate_smart_wait
 
 # The same store the queues use, so services and queues share one database.
 service_store = queues.services
@@ -62,7 +62,11 @@ class Service(ServiceInput):
     @computed_field(alias="estimatedWaitMinutes")
     @property
     def estimated_wait_minutes(self) -> int:
-        return estimate_wait(self.queue_length, self.expected_duration_minutes)
+        return estimate_smart_wait(
+            self.queue_length,
+            self.expected_duration_minutes,
+            queues.history.average_wait_for_service(self.id),
+        )
 
 
 class StatusInput(BaseModel):
