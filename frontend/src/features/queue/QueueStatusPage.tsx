@@ -92,7 +92,7 @@ export function QueueStatusPage() {
               </div>
               <div className="queue-stat">
                 <dt>
-                  <LuClock aria-hidden="true" /> Estimated wait
+                  <LuClock aria-hidden="true" /> Smart estimated wait
                 </dt>
                 <dd>{queue.peopleAhead === 0 ? "You're next" : `About ${formatMinutes(queue.estimatedWaitMinutes)}`}</dd>
               </div>

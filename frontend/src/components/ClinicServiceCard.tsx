@@ -20,7 +20,7 @@ export function ClinicServiceCard({ service, children }: { service: Service; chi
       <dl className="clinic-service__details">
         <div><dt><LuClock aria-hidden="true" /> Typical visit</dt><dd>{formatMinutes(service.expectedDurationMinutes)}</dd></div>
         <div><dt><LuUsers aria-hidden="true" /> Students waiting</dt><dd>{service.queueLength}</dd></div>
-        <div><dt>Estimated wait</dt><dd>{isOpen
+        <div><dt>Smart estimated wait</dt><dd>{isOpen
           ? service.estimatedWaitMinutes === 0 ? 'No wait' : `~${formatMinutes(service.estimatedWaitMinutes)}`
           : 'Unavailable'}</dd></div>
       </dl>

@@ -14,7 +14,7 @@ from .queue_store import (
     AlreadyQueuedError, EntryPriority, EntryStatus, NotQueuedError, QueueEntry, UpdateKind, queues,
 )
 from .service_store import ServiceRecord
-from .wait_time import estimate_wait
+from .wait_time import estimate_smart_wait
 
 
 class _CamelModel(BaseModel):
@@ -69,7 +69,12 @@ def _view(entry: QueueEntry) -> QueueEntryView:
         id=entry.id, ticket=entry.ticket, service_id=entry.service_id,
         service_name=service.name if service else entry.service_name, email=entry.email,
         priority=entry.priority, status=entry.status, position=entry.position, people_ahead=people_ahead,
-        estimated_wait_minutes=estimate_wait(people_ahead, duration), expected_duration_minutes=duration,
+        estimated_wait_minutes=estimate_smart_wait(
+            people_ahead,
+            duration,
+            queues.history.average_wait_for_service(entry.service_id),
+        ),
+        expected_duration_minutes=duration,
         joined_at=entry.joined_at,
         updates=[QueueUpdateView(id=u.id, kind=u.kind, message=u.message, at=u.at) for u in reversed(entry.updates)],
     )

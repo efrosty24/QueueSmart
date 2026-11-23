@@ -90,7 +90,7 @@ export function JoinQueuePage() {
                 <>
                   <dl className="join-stats">
                     <div><dt>Position</dt><dd>#{queue.position}</dd></div>
-                    <div><dt>Estimated wait</dt><dd>{queue.peopleAhead === 0 ? "You're next" : `~${formatMinutes(queue.estimatedWaitMinutes)}`}</dd></div>
+                    <div><dt>Smart estimated wait</dt><dd>{queue.peopleAhead === 0 ? "You're next" : `~${formatMinutes(queue.estimatedWaitMinutes)}`}</dd></div>
                   </dl>
                   <p className="join-muted" aria-live="polite">{queue.updates[0].message}</p>
                   <Link to="/queue" className="btn btn-primary">View queue status</Link>

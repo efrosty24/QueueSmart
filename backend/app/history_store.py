@@ -61,6 +61,21 @@ class HistoryStore:
             ).fetchall()
             return [_visit(row) for row in rows]
 
+    def average_wait_for_service(self, service_id: str, *, sample_size: int = 20) -> float | None:
+        """Return the recent average served wait for a service, if history exists."""
+        if type(sample_size) is not int or sample_size <= 0:
+            raise ValueError("Sample size must be a positive whole number.")
+        with self.database.connect() as connection:
+            row = connection.execute(
+                "SELECT avg(waited_minutes) AS average_wait FROM ("
+                "SELECT waited_minutes FROM History "
+                "WHERE service_id = ? AND outcome = 'served' "
+                "ORDER BY julianday(finished_at) DESC, rowid DESC LIMIT ?"
+                ")",
+                (service_id, sample_size),
+            ).fetchone()
+        return row["average_wait"] if row["average_wait"] is not None else None
+
     def reset(self) -> None:
         """Test helper; normal startup preserves all saved history."""
         with self.database.connect() as connection:
